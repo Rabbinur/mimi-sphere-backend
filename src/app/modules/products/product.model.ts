@@ -108,6 +108,46 @@ const ProductSchema = new Schema<TProduct>(
       default: '',
     },
 
+    brand: {
+      type: Schema.Types.ObjectId,
+      ref: 'Brand',
+    },
+
+    seo_title: {
+      type: String,
+      default: '',
+    },
+    seo_description: {
+      type: String,
+      default: '',
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    shipping_policy: {
+      type: String,
+      default: '',
+    },
+    return_policy: {
+      type: String,
+      default: '',
+    },
+    continue_selling: {
+      type: Boolean,
+      default: false,
+    },
+    charge_tax: {
+      type: Boolean,
+      default: true,
+    },
+    physical_details: {
+      weight: { type: String, default: '' },
+      height: { type: String, default: '' },
+      width: { type: String, default: '' },
+      length: { type: String, default: '' },
+    },
+
     product_status: {
       type: String,
       enum: ['draft', 'active'],

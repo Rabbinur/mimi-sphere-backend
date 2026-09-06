@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { fileServices } from './file.service';
 import { fileValidationSchema } from './file.validation';
-import { uploadToS3 } from '../../middlewares/uploadMiddleware';
+import { uploadToCloudinary, uploadToS3 } from '../../middlewares/uploadMiddleware';
 import axios from 'axios';
 
 export const FileController = {
@@ -12,19 +12,17 @@ export const FileController = {
       }
 
       // If multer.fields() used, req.files is an object, else array (for .array())
-      // Let's support both:
       let files: Express.Multer.File[] = [];
       if (Array.isArray(req.files)) {
         files = req.files;
       } else {
-        // Object keys of files fields, flatten all arrays into one array
         files = Object.values(req.files).flat();
       }
 
-      // Upload each file to S3 and save to DB
+      // Upload each file to Cloudinary and save to DB
       const uploadedFilesData = await Promise.all(
         files.map(async (file) => {
-          const uploadedFile = await uploadToS3(file);
+          const uploadedFile = await uploadToCloudinary(file);
           const fileDoc = await fileServices.createFile({
             ...uploadedFile,
             title: file.originalname,
@@ -50,19 +48,18 @@ export const FileController = {
     }
 
     try {
-      // Step 1: URL থেকে ফাইল ডাউনলোড করা
+      // Step 1: Download file from URL
       const response = await axios.get(fileUrl, {
         responseType: 'arraybuffer',
       });
       const contentType = response.headers['content-type'];
       const buffer = Buffer.from(response.data);
 
-      // ফাইলের নাম বের করার চেষ্টা (URL থেকে)
       const urlParts = fileUrl.split('/');
       const originalName =
         urlParts[urlParts.length - 1].split('?')[0] || 'file';
 
-      // Step 2: S3 আপলোড করার জন্য ফেক Multer ফাইল অবজেক্ট তৈরি করা
+      // Step 2: Create Multer file object
       const fakeFile: Express.Multer.File = {
         fieldname: 'fileUrlUpload',
         originalname: originalName,
@@ -73,13 +70,13 @@ export const FileController = {
         destination: '',
         filename: '',
         path: '',
-        stream: null as any, // unused
+        stream: null as any,
       };
 
-      // Step 3: S3 তে আপলোড
-      const uploadedFile = await uploadToS3(fakeFile);
+      // Step 3: Upload to Cloudinary
+      const uploadedFile = await uploadToCloudinary(fakeFile);
 
-      // Step 4: ডাটাবেজে সেভ
+      // Step 4: Save to Database
       const fileDoc = await fileServices.createFile({
         ...uploadedFile,
         title: originalName,

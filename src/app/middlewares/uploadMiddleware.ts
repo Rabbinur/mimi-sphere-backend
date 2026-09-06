@@ -48,30 +48,75 @@ export const uploadMiddleware = (fieldNames: string | string[], maxCount?: numbe
 };
 
 // Upload to S3
-// export const uploadToS3 = async (file: Express.Multer.File) => {
-//   const sanitizedFilename = file.originalname.replace(/\s+/g, '-');
-//   const key = `uploads/${Date.now()}-${sanitizedFilename}`;
+import { v2 as cloudinary } from 'cloudinary';
 
-//   const params = {
-//     Bucket: config.aws.bucket,
-//     Key: key,
-//     Body: file.buffer,
-//     ContentType: file.mimetype
-//   };
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: config.cloudinary.cloud_name,
+  api_key: config.cloudinary.api_key,
+  api_secret: config.cloudinary.api_secret,
+});
 
-//   try {
-//     await s3Client.send(new PutObjectCommand(params));
-//     return {
-//       url: `${config.aws.file_load_base}${key}`,
-//       key,
-//       size: file.size,
-//       mimetype: file.mimetype
-//     };
-//   } catch (error: any) {
-//     console.error('S3 upload error:', error);
-//     throw new Error(`Failed to upload file: ${error.message}`);
-//   }
-// };
+// Upload to Cloudinary (Active)
+export const uploadToCloudinary = async (
+  file: Express.Multer.File,
+  folder = 'mimisphere/uploads'
+) => {
+  let buffer = file.buffer;
+  let mimetype = file.mimetype;
+  const isImage = mimetype.startsWith('image/');
+
+  if (isImage) {
+    try {
+      buffer = await sharp(file.buffer)
+        .resize({ width: 1600, withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+      mimetype = 'image/webp';
+    } catch (sharpErr) {
+      console.warn('Sharp compression warning:', sharpErr);
+      buffer = file.buffer;
+    }
+  }
+
+  const sanitizedFilename = file.originalname
+    .replace(/\s+/g, '-')
+    .replace(/\.[^/.]+$/, '');
+
+  return new Promise<{
+    url: string;
+    key: string;
+    size: number;
+    mimetype: string;
+  }>((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        public_id: `${Date.now()}-${sanitizedFilename}`,
+        resource_type: 'auto',
+      },
+      (error, result) => {
+        if (error || !result) {
+          console.error('Cloudinary upload error:', error);
+          return reject(
+            new Error(
+              `Failed to upload file to Cloudinary: ${error?.message || 'Unknown error'}`
+            )
+          );
+        }
+        resolve({
+          url: result.secure_url || result.url,
+          key: result.public_id,
+          size: result.bytes || buffer.length,
+          mimetype,
+        });
+      }
+    );
+    uploadStream.end(buffer);
+  });
+};
+
+// Upload to S3 (Preserved for future AWS usage)
 export const uploadToS3 = async (file: Express.Multer.File) => {
   let buffer = file.buffer;
   let mimetype = file.mimetype;
@@ -79,21 +124,21 @@ export const uploadToS3 = async (file: Express.Multer.File) => {
 
   if (isImage) {
     buffer = await sharp(file.buffer)
-      .resize({ width: 800, withoutEnlargement: true })  // max width 800px (change korte paro)
-      .webp({ quality: 75 })  // WebP convert and quality 75%
+      .resize({ width: 800, withoutEnlargement: true })
+      .webp({ quality: 75 })
       .toBuffer();
-    mimetype = 'image/webp';  // mime type update koro
+    mimetype = 'image/webp';
   }
 
-  // Original file name theke extension remove kore .webp add koro
-  const sanitizedFilename = file.originalname.replace(/\s+/g, '-').replace(/\.[^/.]+$/, '') + '.webp';
+  const sanitizedFilename =
+    file.originalname.replace(/\s+/g, '-').replace(/\.[^/.]+$/, '') + '.webp';
   const key = `uploads/${Date.now()}-${sanitizedFilename}`;
 
   const params = {
     Bucket: config.aws.bucket,
     Key: key,
     Body: buffer,
-    ContentType: mimetype
+    ContentType: mimetype,
   };
 
   try {
@@ -102,13 +147,13 @@ export const uploadToS3 = async (file: Express.Multer.File) => {
       url: `${config.aws.file_load_base}${key}`,
       key,
       size: buffer.length,
-      mimetype
+      mimetype,
     };
   } catch (error: any) {
     console.error('S3 upload error:', error);
     throw new Error(`Failed to upload file: ${error.message}`);
   }
-}
+};
 
 // Extend Express Request
 declare module 'express' {

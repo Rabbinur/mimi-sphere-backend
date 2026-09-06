@@ -26,6 +26,11 @@ export default {
       process.env.AWS_FILE_LOAD_BASE ||
       'https://softwebsys.s3.us-east-1.amazonaws.com',
   },
+  cloudinary: {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
+    api_key: process.env.CLOUDINARY_API_KEY || '',
+    api_secret: process.env.CLOUDINARY_API_SECRET || '',
+  },
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: process.env.SMTP_PORT || '587',

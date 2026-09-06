@@ -68,4 +68,19 @@ export interface TProduct {
 
   is_pre_order?: boolean;
   pre_order_message?: string;
+
+  brand?: Types.ObjectId | string;
+  seo_title?: string;
+  seo_description?: string;
+  tags?: string[];
+  shipping_policy?: string;
+  return_policy?: string;
+  continue_selling?: boolean;
+  charge_tax?: boolean;
+  physical_details?: {
+    weight?: string;
+    height?: string;
+    width?: string;
+    length?: string;
+  };
 }
