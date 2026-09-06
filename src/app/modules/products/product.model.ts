@@ -43,6 +43,17 @@ const ProductSchema = new Schema<TProduct>(
       default: 0,
     },
 
+    cost_price: {
+      type: Number,
+      default: 0,
+    },
+
+    barcode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     discount_percentage: {
       type: Number,
       default: 0,
@@ -163,9 +174,21 @@ const ProductSchema = new Schema<TProduct>(
           type: Number,
           required: true,
         },
+        cost_price: {
+          type: Number,
+          default: 0,
+        },
         variant_quantity: {
           type: Number,
           default: 0,
+        },
+        sku: {
+          type: String,
+          default: '',
+        },
+        barcode: {
+          type: String,
+          default: '',
         },
         compare_at_price: Number,
         image: {

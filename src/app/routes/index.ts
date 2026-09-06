@@ -27,11 +27,16 @@ import { ReviewRoutes } from '../modules/review/review.route';
 import { CheckoutLeadRoutes } from '../modules/checkout-lead/checkout-lead.routes';
 import { CampaignRoutes } from '../modules/campaign/campaign.routes';
 import { CollectionRoutes } from '../modules/collection/collection.route';
+import { PosRoutes } from '../modules/pos/pos.routes';
 
 
 const router = Router();
 
 const moduleRoutes = [
+  {
+    path: '/admin/pos',
+    route: PosRoutes,
+  },
   {
     path: '/campaigns',
     route: CampaignRoutes,

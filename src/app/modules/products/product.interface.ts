@@ -12,6 +12,8 @@ export interface TProduct {
 
   product_price: number;
   compare_at_price?: number;
+  cost_price?: number;
+  barcode?: string;
 
   discount_percentage?: number;
 
@@ -53,8 +55,11 @@ export interface TProduct {
   product_variants?: {
     variant_option_values: Map<string, string> | Record<string, string>;
     variant_price: number;
+    cost_price?: number;
     variant_quantity?: number;
     compare_at_price?: number;
+    sku?: string;
+    barcode?: string;
     image?: string;
   }[];
 

@@ -569,6 +569,51 @@ const scrapeProduct = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getInventory = catchAsync(async (req: Request, res: Response) => {
+  const { page, per_page, search, sort_by, sort_order, status_filter } = req.query;
+
+  const result = await ProductServices.getInventoryFromDB({
+    page: page ? Number(page) : undefined,
+    per_page: per_page ? Number(per_page) : undefined,
+    search: search ? String(search) : undefined,
+    sort_by: sort_by ? String(sort_by) : undefined,
+    sort_order: sort_order === 'asc' || sort_order === 'desc' ? sort_order : undefined,
+    status_filter: status_filter as any,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Inventory records fetched successfully',
+    data: result,
+  });
+});
+
+const updateInventoryStock = catchAsync(async (req: Request, res: Response) => {
+  const { id, quantity } = req.body;
+  const result = await ProductServices.updateInventoryQuantityInDB(id, Number(quantity));
+
+  res.status(200).json({
+    success: true,
+    message: 'Inventory quantity updated successfully',
+    data: result,
+  });
+});
+
+const bulkUpdateInventoryStock = catchAsync(async (req: Request, res: Response) => {
+  const { ids, action, value } = req.body;
+  const result = await ProductServices.bulkUpdateInventoryQuantityInDB(
+    ids,
+    action,
+    Number(value),
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Bulk inventory updated successfully',
+    data: result,
+  });
+});
+
 export const ProductController = {
   createProduct,
   getAllProducts,
@@ -584,4 +629,7 @@ export const ProductController = {
   getTrendyProducts,
   scrapeProduct,
   syncToGoogleMerchant,
+  getInventory,
+  updateInventoryStock,
+  bulkUpdateInventoryStock,
 };
