@@ -1,13 +1,13 @@
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Application, NextFunction, Request, Response } from 'express';
-import globalErrorHandler from './app/middlewares/globalErrorHandler';
-import cookieParser from 'cookie-parser';
-import router from './app/routes';
-import compression from 'compression';
-import morgan from 'morgan';
 import fs from 'fs';
+import morgan from 'morgan';
 import path from 'path';
+import globalErrorHandler from './app/middlewares/globalErrorHandler';
+import router from './app/routes';
 import logger from './app/utils/logger';
 
 dotenv.config();
@@ -80,7 +80,7 @@ app.use(
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: 'Shopping Cart BD server is running!',
+    message: 'Mimi Sphere server is running!',
   });
 });
 

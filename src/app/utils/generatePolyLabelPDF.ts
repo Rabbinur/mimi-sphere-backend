@@ -1,7 +1,7 @@
-import PDFDocument from 'pdfkit';
-import { Response } from 'express';
-import { TOrder } from '../modules/orders/order.interface';
 import axios from 'axios';
+import { Response } from 'express';
+import PDFDocument from 'pdfkit';
+import { TOrder } from '../modules/orders/order.interface';
 
 // Helper to fetch image buffer
 const fetchBuffer = async (url: string): Promise<Buffer | null> => {
@@ -77,14 +77,14 @@ export const createPolyLabelPDFBuffer = async (
           .fillColor('#000000')
           .fontSize(16)
           .font('Helvetica-Bold')
-          .text('Shopping Cart BD', 40, 40);
+          .text('Mimi Sphere', 40, 40);
       }
     } else {
       doc
         .fillColor('#000000')
         .fontSize(16)
         .font('Helvetica-Bold')
-        .text('Shopping Cart BD', 40, 40);
+        .text('Mimi Sphere', 40, 40);
     }
 
     // Order No (Top Right)

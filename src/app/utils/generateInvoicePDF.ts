@@ -1,8 +1,8 @@
-import PDFDocument from 'pdfkit';
-import { Response } from 'express';
-import { TOrder } from '../modules/orders/order.interface';
 import axios from 'axios';
+import { Response } from 'express';
+import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import { TOrder } from '../modules/orders/order.interface';
 
 // Helper to fetch image or font buffer
 const fetchBuffer = async (url: string): Promise<Buffer | null> => {
@@ -85,14 +85,14 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
           .fontSize(20)
           .fillColor(primaryColor)
           .font('Helvetica-Bold')
-          .text('Shopping Cart BD', 40, headerY);
+          .text('Mimi Sphere', 40, headerY);
       }
     } else {
       doc
         .fontSize(20)
         .fillColor(primaryColor)
         .font('Helvetica-Bold')
-        .text('Shopping Cart BD', 40, headerY);
+        .text('Mimi Sphere', 40, headerY);
     }
 
     // Company Info
@@ -100,7 +100,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
       .fontSize(10)
       .font('Helvetica-Bold')
       .fillColor(primaryColor)
-      .text('Shopping Cart BD', 300, headerY, { align: 'right' });
+      .text('Mimi Sphere', 300, headerY, { align: 'right' });
     doc
       .font('Helvetica')
       .text('info@shoppingcart.bd', 300, headerY + 14, { align: 'right' });
@@ -173,8 +173,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
       { align: 'right' },
     );
     doc.text(
-      `Delivery: ${
-        order.delivery_zone === 'inside_dhaka' ? 'Inside Dhaka' : 'Outside Dhaka'
+      `Delivery: ${order.delivery_zone === 'inside_dhaka' ? 'Inside Dhaka' : 'Outside Dhaka'
       }`,
       300,
       detailsY + 65,
@@ -217,7 +216,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
         if (imgBuffer) {
           try {
             doc.image(imgBuffer, 45, rowY, { width: 35, height: 35 });
-          } catch (e) {}
+          } catch (e) { }
         }
       }
 
@@ -228,7 +227,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
       if (product.selected_variant_values) {
         let variantEntries: [string, any][] = [];
         const svv = product.selected_variant_values as any;
-        
+
         if (svv instanceof Map) {
           variantEntries = Array.from(svv.entries());
         } else if (typeof svv.toJSON === 'function') {
@@ -240,7 +239,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
         const variants = variantEntries
           .map(([k, v]) => `${k}: ${v}`)
           .join(', ');
-          
+
         if (variants) {
           doc
             .fontSize(8)
@@ -352,7 +351,7 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
     doc
       .font('Helvetica-Bold')
       .fillColor(accentColor)
-      .text('Shopping Cart BD', 400, footerY + 37, { align: 'right' });
+      .text('Mimi Sphere', 400, footerY + 37, { align: 'right' });
 
     doc.end();
   });

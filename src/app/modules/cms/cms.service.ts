@@ -6,7 +6,7 @@ import { CMS } from './cms.types';
  */
 const DEFAULT_CMS_DATA: CMS = {
   company: {
-    name: 'Shopping Cart BD',
+    name: 'Mimi Sphere',
     email: 'info@shoppingcart.bd',
     phone: '+8801722597565',
     address: 'Dhaka, Bangladesh',

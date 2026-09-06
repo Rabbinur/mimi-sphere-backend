@@ -1,5 +1,5 @@
 /**
- * Professional Email Templates for Shopping Cart BD
+ * Professional Email Templates for Mimi Sphere
  * Styled to match the Invoice PDF design.
  */
 
@@ -24,7 +24,7 @@ const headerTemplate = `
       ">
         <img 
           src="https://www.shoppingcart.bd/logo.png" 
-          alt="Shopping Cart BD" 
+          alt="Mimi Sphere" 
           style="height: 30px; margin-bottom: 2px;"
         /><br/>
         info@shoppingcart.bd<br/>
@@ -145,7 +145,7 @@ const footerTemplate = `
                 font-size: 12px;
                 font-weight: bold;
               ">
-                Shopping Cart BD
+                Mimi Sphere
               </span>
             </td>
           </tr>
@@ -282,7 +282,7 @@ export const getPasswordChangeTemplate = (name: string) => {
         <div class="content">
           <h2 style="margin: 0 0 15px 0; color: ${primaryColor};">Security Update</h2>
           <p style="margin:0; font-size: 16px;">Hi <strong>${name}</strong>,</p>
-          <p style="margin:15px 0; font-size: 15px;">This is a courtesy notification to let you know that the password for your <strong>Shopping Cart BD</strong> account was recently changed.</p>
+          <p style="margin:15px 0; font-size: 15px;">This is a courtesy notification to let you know that the password for your <strong>Mimi Sphere</strong> account was recently changed.</p>
           <div class="warning">
             <strong>Not you?</strong> If you did not make this change, please contact our support team immediately at <strong>+8801722 597565</strong> to secure your account.
           </div>
@@ -320,7 +320,7 @@ export const getWelcomeTemplate = (name: string) => {
         </div>
         <div class="content">
           <p style="font-size: 18px; margin:0;">Hi <strong>${name}</strong>,</p>
-          <p style="margin:20px 0; font-size: 16px; color: #555;">We're thrilled to have you join <strong>Shopping Cart BD</strong>. You're now part of a community that values quality, authenticity, and the best deals in Bangladesh.</p>
+          <p style="margin:20px 0; font-size: 16px; color: #555;">We're thrilled to have you join <strong>Mimi Sphere</strong>. You're now part of a community that values quality, authenticity, and the best deals in Bangladesh.</p>
           <p style="font-size: 15px; color: #666;">Ready to explore? Click the button below to start your shopping journey.</p>
           <a href="https://shoppingcart.bd" class="btn">Start Shopping</a>
         </div>

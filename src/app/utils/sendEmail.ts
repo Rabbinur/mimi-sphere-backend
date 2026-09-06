@@ -22,7 +22,7 @@ export const sendEmail = async (
   });
 
   await transporter.sendMail({
-    from: `Shopping Cart BD <info@shoppingcart.bd>`,
+    from: `Mimi Sphere <info@shoppingcart.bd>`,
     to,
     subject,
     text,
