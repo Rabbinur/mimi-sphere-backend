@@ -205,38 +205,36 @@ class PosService {
     }
 
     // Format products for standard Order model
-    const orderItems = payload.items.map((it) => ({
+    const orderProducts = payload.items.map((it) => ({
       product_id: it.product_id,
-      quantity: it.quantity,
+      variant_id: it.variant_id || null,
+      title: it.product_name,
+      thumbnail: it.image || null,
       price: it.price,
-      name: it.product_name,
-      image: it.image || '',
-      variant: it.combination_label || '',
-      sku: it.sku || '',
+      quantity: it.quantity,
+      total_price: it.total || it.price * it.quantity,
     }));
 
     // Create Order in DB
     const order = await Order.create({
       order_id: orderNumber,
-      receipt_number: receiptNumber,
       order_type: 'POS',
       customer_name: payload.customer_name || 'Walk-in Customer',
-      customer_phone: payload.customer_phone || 'N/A',
-      customer_email: payload.customer_email || 'walkin@store.local',
-      items: orderItems,
+      phone: payload.customer_phone || '01700000000',
+      email: payload.customer_email || 'walkin@store.local',
+      district: 'Dhaka',
+      upazila: 'In-Store POS',
+      village_or_area: 'Store Counter',
+      delivery_zone: 'inside_dhaka',
+      products: orderProducts,
       total_price: payload.total,
-      subtotal: payload.subtotal,
-      discount: payload.discount || 0,
-      coupon_code: payload.coupon_code || '',
-      tax: payload.tax || 0,
-      status: 'Delivered', // In-store POS sale is delivered on counter
-      payment_status: 'Paid',
-      payment_method: payload.payment_method || 'cash',
+      discount_amount: payload.discount || 0,
+      coupon: payload.coupon_code || undefined,
+      order_status: 'delivered', // In-store POS sale is delivered directly
+      payment_status: 'paid',
+      payment_method: payload.payment_method || 'POS_CASH',
       delivery_charge: 0,
-      shipping_address: {
-        address: 'In-Store Counter Purchase',
-        city: 'Dhaka',
-      },
+      notes: payload.note || 'In-Store POS Counter Purchase',
     });
 
     const receiptData = {

@@ -55,18 +55,24 @@ export const OrderSchema = new Schema<TOrder>(
       enum: ['inside_dhaka', 'outside_dhaka'],
     },
 
+    order_type: {
+      type: String,
+      enum: ['ONLINE', 'POS'],
+      default: 'ONLINE',
+    },
+
     products: {
       type: [OrderProductSchema],
       required: true,
       validate: {
-        validator: (v: any[]) => v.length > 0,
+        validator: (v: any[]) => v && v.length > 0,
         message: 'Order must contain at least one product',
       },
     },
 
     payment_method: {
       type: String,
-      enum: ['COD', 'ONLINE'],
+      enum: ['COD', 'ONLINE', 'POS_CASH', 'POS_CARD', 'POS_BKASH', 'POS_NAGAD', 'POS_OTHER', 'cash', 'card', 'bkash', 'nagad', 'other'],
       required: true,
     },
 
@@ -79,6 +85,7 @@ export const OrderSchema = new Schema<TOrder>(
     delivery_charge: {
       type: Number,
       required: true,
+      default: 0,
       min: 0,
     },
 

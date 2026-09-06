@@ -109,8 +109,9 @@ const ProductSchema = new Schema<TProduct>(
     },
 
     brand: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.Mixed,
       ref: 'Brand',
+      set: (v: any) => (v === '' || v === null ? undefined : v),
     },
 
     seo_title: {

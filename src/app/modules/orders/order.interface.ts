@@ -34,12 +34,13 @@ export type TOrder = {
   upazila: string;
   district: string;
   delivery_zone?: 'inside_dhaka' | 'outside_dhaka';
-
   /* -------- Products -------- */
   products: TOrderProduct[];
 
+  order_type?: 'ONLINE' | 'POS';
+
   /* -------- Payment -------- */
-  payment_method: 'COD' | 'ONLINE';
+  payment_method: 'COD' | 'ONLINE' | 'POS_CASH' | 'POS_CARD' | 'POS_BKASH' | 'POS_NAGAD' | 'POS_OTHER' | string;
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   delivery_charge: number;
 
