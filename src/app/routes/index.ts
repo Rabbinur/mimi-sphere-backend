@@ -28,6 +28,7 @@ import { CheckoutLeadRoutes } from '../modules/checkout-lead/checkout-lead.route
 import { CampaignRoutes } from '../modules/campaign/campaign.routes';
 import { CollectionRoutes } from '../modules/collection/collection.route';
 import { PosRoutes } from '../modules/pos/pos.routes';
+import { CustomerReviewRoutes } from '../modules/customer-review/customerReview.routes';
 
 
 const router = Router();
@@ -133,6 +134,10 @@ const moduleRoutes = [
   {
     path: '/reviews',
     route: ReviewRoutes,
+  },
+  {
+    path: '/customer-reviews',
+    route: CustomerReviewRoutes,
   },
   {
     path: '/checkout-leads',
