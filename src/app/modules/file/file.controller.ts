@@ -7,16 +7,19 @@ import axios from 'axios';
 export const FileController = {
   createFile: async (req: Request, res: Response) => {
     try {
-      if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
-        return res.status(400).json({ message: 'No files uploaded' });
+      let files: Express.Multer.File[] = [];
+      if (req.files) {
+        if (Array.isArray(req.files)) {
+          files = req.files;
+        } else {
+          files = Object.values(req.files).flat();
+        }
+      } else if (req.file) {
+        files = [req.file];
       }
 
-      // If multer.fields() used, req.files is an object, else array (for .array())
-      let files: Express.Multer.File[] = [];
-      if (Array.isArray(req.files)) {
-        files = req.files;
-      } else {
-        files = Object.values(req.files).flat();
+      if (files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded or file format not supported' });
       }
 
       // Upload each file to Cloudinary and save to DB
@@ -25,7 +28,7 @@ export const FileController = {
           const uploadedFile = await uploadToCloudinary(file);
           const fileDoc = await fileServices.createFile({
             ...uploadedFile,
-            title: file.originalname,
+            title: file.originalname || 'Uploaded File',
           });
           return fileDoc;
         }),
@@ -36,7 +39,8 @@ export const FileController = {
         files: uploadedFilesData,
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error('File upload error:', error);
+      res.status(500).json({ message: error.message || 'File upload failed' });
     }
   },
 

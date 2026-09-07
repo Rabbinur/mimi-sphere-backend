@@ -21,30 +21,35 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  const allowedTypes = [
-    'image/jpeg',
-    'image/png',
+  const isImage = file.mimetype.startsWith('image/');
+  const isDoc = [
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ];
-  cb(null, allowedTypes.includes(file.mimetype));
+    'application/msword',
+  ].includes(file.mimetype);
+
+  if (isImage || isDoc) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
 };
 
 // Upload middleware
-export const uploadMiddleware = (fieldNames: string | string[], maxCount?: number) => {
-  if (Array.isArray(fieldNames)) {
-    return multer({
-      storage,
-      limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter
-    }).fields(fieldNames.map(name => ({ name, maxCount: maxCount || 1 })));
-  } else {
-    return multer({
-      storage,
-      limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter
-    }).array(fieldNames, maxCount || 4);
+export const uploadMiddleware = (fieldNames?: string | string[], maxCount?: number) => {
+  const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter,
+  });
+
+  if (!fieldNames) {
+    return upload.any();
   }
+  if (Array.isArray(fieldNames)) {
+    return upload.fields(fieldNames.map(name => ({ name, maxCount: maxCount || 10 })));
+  }
+  return upload.any();
 };
 
 // Upload to S3
