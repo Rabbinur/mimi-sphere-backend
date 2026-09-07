@@ -14,6 +14,25 @@ export const productValidationSchema = z.object({
   product_price: z.number().positive('Product price must be greater than 0'),
 
   compare_at_price: z.number().optional(),
+  cost_price: z.number().optional(),
+  barcode: z.string().optional(),
+  brand: z.string().optional(),
+
+  seo_title: z.string().optional(),
+  seo_description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  shipping_policy: z.string().optional(),
+  return_policy: z.string().optional(),
+  continue_selling: z.boolean().optional(),
+  charge_tax: z.boolean().optional(),
+  physical_details: z
+    .object({
+      weight: z.string().optional(),
+      height: z.string().optional(),
+      width: z.string().optional(),
+      length: z.string().optional(),
+    })
+    .optional(),
 
   discount_percentage: z.number().min(0).max(100).optional(),
 
@@ -67,8 +86,11 @@ export const productValidationSchema = z.object({
       z.object({
         variant_option_values: z.record(z.string()),
         variant_price: z.number().positive(),
+        cost_price: z.number().optional(),
         variant_quantity: z.number().int().min(0).optional(),
         compare_at_price: z.number().optional(),
+        sku: z.string().optional(),
+        barcode: z.string().optional(),
         image: z.string().optional(),
       }),
     )
