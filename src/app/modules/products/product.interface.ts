@@ -40,6 +40,7 @@ export interface TProduct {
 
   is_featured?: boolean;
   is_trendy?: boolean;
+  is_new_arrival?: boolean;
   is_limited_time_offer?: boolean;
 
   product_attributes?: {

@@ -16,7 +16,7 @@ const createCategory = async (
 const getAllCategories = async (subCategory: boolean): Promise<TCategory[]> => {
   try {
     const categories: TCategory[] = await CategoryModel.find()
-      .select('_id name slug description  imageUrl isActive createdAt order ')
+      .select('_id name slug description imageUrl parent_category_id isActive createdAt order')
       .sort({ order: 1, createdAt: 1 })
       .lean();
     if (subCategory == false) {

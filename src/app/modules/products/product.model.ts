@@ -173,6 +173,10 @@ const ProductSchema = new Schema<TProduct>(
       type: Boolean,
       default: false,
     },
+    is_new_arrival: {
+      type: Boolean,
+      default: false,
+    },
     is_limited_time_offer: {
       type: Boolean,
       default: false,

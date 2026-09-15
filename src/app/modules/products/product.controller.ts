@@ -115,7 +115,21 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
         pagination: { total: 0, page, limit, totalPages: 0 },
       });
     }
-    searchQuery.product_categories = categoryData._id;
+
+    // Match parent category as well as any subcategories under it
+    const childCategories = await CategoryModel.find({
+      parent_category_id: categoryData._id,
+    }).select('_id');
+    const allMatchingCatIds = [
+      categoryData._id,
+      ...childCategories.map((c: any) => c._id),
+    ];
+    searchQuery.product_categories = { $in: allMatchingCatIds };
+  }
+
+  // 🌟 New arrival filter if requested explicitly
+  if (req.query.is_new_arrival === 'true') {
+    searchQuery.is_new_arrival = true;
   }
 
   // ✅ VARIANT FILTER — Optimized for performance using exact matches
@@ -190,9 +204,13 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
     compare_at_price: product.compare_at_price,
     discount_percentage: Math.round(product.discount_percentage ?? 0),
     product_vendor: product.product_vendor,
+    product_categories: product.product_categories,
     product_variants: product.product_variants,
     quantity: product.quantity,
     moq: product.moq,
+    is_featured: product.is_featured,
+    is_trendy: product.is_trendy,
+    is_new_arrival: product.is_new_arrival,
     is_pre_order: product.is_pre_order,
     pre_order_message: product.pre_order_message,
     is_free_delivery: product.is_free_delivery,

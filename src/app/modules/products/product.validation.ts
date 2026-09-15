@@ -58,6 +58,7 @@ export const productValidationSchema = z.object({
 
   is_featured: z.boolean().optional(),
   is_trendy: z.boolean().optional(),
+  is_new_arrival: z.boolean().optional(),
   is_limited_time_offer: z.boolean().optional(),
   is_pre_order: z.boolean().optional(),
   pre_order_message: z.string().optional(),
