@@ -69,20 +69,30 @@ const getCollectionBySlug = async (slug: string): Promise<any | null> => {
       const andConditions: any[] = [];
 
       if (brands && brands.length > 0) {
-        andConditions.push({ product_vendor: { $in: brands } });
+        // Match by product_vendor string OR brand name (case-insensitive)
+        andConditions.push({
+          $or: [
+            { product_vendor: { $in: brands } },
+            { 'brand.name': { $in: brands } },
+          ]
+        });
       }
       if (categories && categories.length > 0) {
         const categoryIds = categories.map(cat => new Types.ObjectId(cat.toString()));
         andConditions.push({ product_categories: { $in: categoryIds } });
       }
       if (tags && tags.length > 0) {
-        const tagConditions = tags.map(tag => ({
+        // Match tags against:
+        // 1. product `tags` array field (each element)
+        // 2. product_title text (broad fallback for title-based tags)
+        const tagRegexes = tags.map(t => new RegExp(t, 'i'));
+        andConditions.push({
           $or: [
-            { 'product_attributes.value': { $regex: tag, $options: 'i' } },
-            { product_title: { $regex: tag, $options: 'i' } }
+            { tags: { $in: tagRegexes } },              // array of strings
+            { product_title: { $in: tagRegexes } },     // title fallback
+            { product_description: { $in: tagRegexes } } // description fallback
           ]
-        }));
-        andConditions.push({ $or: tagConditions });
+        });
       }
 
       if (andConditions.length > 0) {
