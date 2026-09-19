@@ -96,7 +96,9 @@ const getAllCategories = async (req: Request, res: Response): Promise<void> => {
   try {
     const categories = await categoryServices.getAllCategories(subCategory, isActive);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.status(200).json(categories);
   } catch (error) {
     console.error('Error getting all categories:', error);
