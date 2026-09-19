@@ -31,10 +31,26 @@ export interface HeroFeature {
   link: string;
 }
 
+export interface BentoItem {
+  badge?: string;
+  title: string;
+  subtitle?: string;
+  image: string;
+  link: string;
+}
+
+export interface BentoGridCMS {
+  isEnabled: boolean;
+  tag?: string;
+  title?: string;
+  items: BentoItem[];
+}
+
 export interface CMS {
   company: Company;
   social: Social;
   heroSliderDesktop: HeroSlide[];
   heroSliderMobile: HeroSlide[];
   heroFeatures: HeroFeature[];
+  bentoGrid?: BentoGridCMS;
 }

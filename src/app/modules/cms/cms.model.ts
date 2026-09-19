@@ -41,6 +41,20 @@ const CMSchema = new Schema<CMS>(
         link: { type: String, default: '' },
       },
     ],
+    bentoGrid: {
+      isEnabled: { type: Boolean, default: true },
+      tag: { type: String, default: 'Featured Highlights' },
+      title: { type: String, default: 'Trending Collections' },
+      items: [
+        {
+          badge: { type: String, default: '' },
+          title: { type: String, default: '' },
+          subtitle: { type: String, default: '' },
+          image: { type: String, default: '' },
+          link: { type: String, default: '' },
+        },
+      ],
+    },
   },
   { timestamps: true },
 );
