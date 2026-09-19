@@ -43,17 +43,26 @@ const CMSchema = new Schema<CMS>(
     ],
     bentoGrid: {
       isEnabled: { type: Boolean, default: true },
-      tag: { type: String, default: 'Featured Highlights' },
-      title: { type: String, default: 'Trending Collections' },
+      tag: { type: String, default: 'Handpicked For You' },
+      title: { type: String, default: 'Signature Collections' },
       items: [
         {
           badge: { type: String, default: '' },
+          badgeColor: { type: String, default: 'rose' },
           title: { type: String, default: '' },
           subtitle: { type: String, default: '' },
           image: { type: String, default: '' },
           link: { type: String, default: '' },
+          categorySlug: { type: String, default: '' },
+          colSpan: { type: Number, default: 1 },
+          rowSpan: { type: Number, default: 1 },
         },
       ],
+    },
+    featuredCollections: {
+      isEnabled: { type: Boolean, default: true },
+      title: { type: String, default: 'Featured Collections' },
+      subtitle: { type: String, default: 'Explore our curated collections' },
     },
   },
   { timestamps: true },

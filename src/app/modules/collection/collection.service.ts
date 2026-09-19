@@ -14,6 +14,7 @@ const getAllCollections = async (
   page?: string,
   limit?: string,
   searchTerm?: string,
+  isActive?: string,
 ): Promise<any> => {
   const p = Number(page) || 1;
   const l = Number(limit) || 10;
@@ -21,6 +22,10 @@ const getAllCollections = async (
 
   if (searchTerm) {
     query.name = { $regex: searchTerm, $options: 'i' };
+  }
+
+  if (isActive !== undefined && isActive !== '') {
+    query.isActive = isActive === 'true';
   }
 
   let collections;

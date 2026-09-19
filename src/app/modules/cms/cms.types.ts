@@ -33,10 +33,14 @@ export interface HeroFeature {
 
 export interface BentoItem {
   badge?: string;
+  badgeColor?: string;
   title: string;
   subtitle?: string;
   image: string;
   link: string;
+  categorySlug?: string;
+  colSpan?: number;
+  rowSpan?: number;
 }
 
 export interface BentoGridCMS {
@@ -46,6 +50,12 @@ export interface BentoGridCMS {
   items: BentoItem[];
 }
 
+export interface FeaturedCollectionsCMS {
+  isEnabled: boolean;
+  title?: string;
+  subtitle?: string;
+}
+
 export interface CMS {
   company: Company;
   social: Social;
@@ -53,4 +63,5 @@ export interface CMS {
   heroSliderMobile: HeroSlide[];
   heroFeatures: HeroFeature[];
   bentoGrid?: BentoGridCMS;
+  featuredCollections?: FeaturedCollectionsCMS;
 }
