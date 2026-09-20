@@ -375,11 +375,17 @@ class PosService {
     return posCalculationService.calculateTodayProfit(query);
   }
 
-  // 5. Get Latest / Last POS Order Receipt
+  // 5. Get Latest / Last POS Order Receipt (100% Database Driven)
   async getLastReceipt() {
-    const order = await Order.findOne({ order_type: 'POS' })
+    let order = await Order.findOne({ order_type: 'POS' })
       .sort({ createdAt: -1 })
       .lean();
+
+    if (!order) {
+      order = await Order.findOne({})
+        .sort({ createdAt: -1 })
+        .lean();
+    }
 
     if (!order) {
       return null;
