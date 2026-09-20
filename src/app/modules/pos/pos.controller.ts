@@ -48,12 +48,23 @@ class PosController {
   });
 
   getPosShiftSummary = catchAsync(async (req: Request, res: Response) => {
-    const result = await posService.getPosShiftSummary(req.query);
+    const result = await posService.getPosShiftSummary(req.query.date as string | undefined);
 
     sendResponse(res, {
       statusCode: HttpStatusCode.OK,
       success: true,
       message: 'POS Shift summary fetched successfully',
+      data: result,
+    });
+  });
+
+  getTodayProfit = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.getTodayProfit(req.query);
+
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: "Today's profit analytics fetched successfully",
       data: result,
     });
   });

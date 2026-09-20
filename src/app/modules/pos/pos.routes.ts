@@ -12,6 +12,7 @@ router.post('/orders',                admin, posController.createPosOrder);
 router.get('/customer/:phone',        admin, posController.lookupCustomer);
 router.get('/customer/:phone/history',admin, posController.getCustomerHistory);
 router.get('/shift-summary',          admin, posController.getPosShiftSummary);
+router.get('/today-profit',           admin, posController.getTodayProfit);
 router.get('/last-receipt',           admin, posController.getLastReceipt);
 router.get('/members',                admin, posController.getMembersList);
 router.get('/orders-list',            admin, posController.getPosOrdersList);
