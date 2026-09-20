@@ -2,17 +2,39 @@ import axios from 'axios';
 import { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
 import { TOrder } from '../modules/orders/order.interface';
 
-// Helper to fetch image or font buffer
-const fetchBuffer = async (url: string): Promise<Buffer | null> => {
+// Cache font buffer in memory to avoid repeated network requests
+let cachedFontBuffer: Buffer | null = null;
+
+// Helper to fetch image or font buffer with timeout
+const fetchBuffer = async (url: string, timeout = 2000): Promise<Buffer | null> => {
   try {
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout });
     return Buffer.from(response.data, 'binary');
   } catch (error) {
-    console.error(`Failed to fetch from ${url}`);
     return null;
   }
+};
+
+const getLocalLogoBuffer = (): Buffer | null => {
+  const possiblePaths = [
+    path.resolve(process.cwd(), '../mimi-sphere-bd/public/logo.png'),
+    path.resolve(__dirname, '../../../../mimi-sphere-bd/public/logo.png'),
+    path.resolve(process.cwd(), 'public/logo.png'),
+  ];
+  for (const p of possiblePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p);
+      }
+    } catch {
+      // Continue to next path
+    }
+  }
+  return null;
 };
 
 /**
@@ -35,14 +57,20 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
     const accentColor = '#0056b3';
 
     // --- Load Assets ---
-    const logoUrl = 'https://www.shoppingcart.bd/logo.png';
-    const fontUrl =
-      'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansBengali/NotoSansBengali-Regular.ttf';
+    let logoBuffer = getLocalLogoBuffer();
+    if (!logoBuffer) {
+      logoBuffer = await fetchBuffer('https://mimisphere.com/logo.png');
+    }
 
-    const [logoBuffer, fontBuffer] = await Promise.all([
-      fetchBuffer(logoUrl),
-      fetchBuffer(fontUrl),
-    ]);
+    let fontBuffer = cachedFontBuffer;
+    if (!fontBuffer) {
+      const fontUrl =
+        'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansBengali/NotoSansBengali-Regular.ttf';
+      fontBuffer = await fetchBuffer(fontUrl, 2500);
+      if (fontBuffer) {
+        cachedFontBuffer = fontBuffer;
+      }
+    }
 
     // Register font if loaded
     if (fontBuffer) {
@@ -103,8 +131,8 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
       .text('Mimi Sphere', 300, headerY, { align: 'right' });
     doc
       .font('Helvetica')
-      .text('info@shoppingcart.bd', 300, headerY + 14, { align: 'right' });
-    doc.text('+8801722597565', 300, headerY + 28, { align: 'right' });
+      .text('support@mimisphere.com', 300, headerY + 14, { align: 'right' });
+    doc.text('+880 1719-713061', 300, headerY + 28, { align: 'right' });
 
     // Border bottom
     doc
@@ -330,9 +358,9 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
 
     doc.font('Helvetica-Bold').fontSize(8).fillColor(secondaryColor);
     doc.text('CONTACT INFORMATION', 40, footerY + 15);
-    doc.font('Helvetica').text('Phone: +8801722597565', 40, footerY + 27);
-    doc.text('Email: info@shoppingcart.bd', 40, footerY + 37);
-    doc.text('Web: www.shoppingcart.bd', 40, footerY + 47);
+    doc.font('Helvetica').text('Phone: +880 1719-713061', 40, footerY + 27);
+    doc.text('Email: support@mimisphere.com', 40, footerY + 37);
+    doc.text('Web: www.mimisphere.com', 40, footerY + 47);
 
     // Col 2: QR Code
     const qrData = `Order ID: ${order.order_id}\nCustomer: ${order.customer_name}\nTotal: ${order.total_price}`;
@@ -352,6 +380,26 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
       .font('Helvetica-Bold')
       .fillColor(accentColor)
       .text('Mimi Sphere', 400, footerY + 37, { align: 'right' });
+
+    // --- Return Policy Section (Hidden by default, toggle SHOW_RETURN_POLICY_ON_INVOICE to true when needed) ---
+    const SHOW_RETURN_POLICY_ON_INVOICE = false;
+
+    if (SHOW_RETURN_POLICY_ON_INVOICE) {
+      const returnY = footerY + 60;
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(primaryColor);
+      doc.text('Return Policy', 40, returnY);
+      doc.font('Helvetica').fontSize(6.5).fillColor(secondaryColor);
+      const policyText =
+        '1. If any defect is found (damaged/ defective/ wrong product) after opening the box, inform MIMI SPHERE Customer Service (via hotline +880 1719-713061 or support@mimisphere.com) as soon as possible along with picture/video proof. ' +
+        '2. Return process must be initiated within 7 days of receiving the parcel. ' +
+        '3. Product quality needs to be in the original condition. Products must not be used, worn, altered, or washed. Product hand tags, packaging, and the original invoice must be returned along with the products. ' +
+        '4. Exchange delivery cost may be applicable. ' +
+        '5. Promotional offers are not applicable for returned products.';
+      doc.text(policyText, 40, returnY + 10, { width: 515, lineGap: 1.5 });
+
+      doc.font('Helvetica-Bold').fontSize(6).text('Disclaimer: ', 40, returnY + 44, { continued: true });
+      doc.font('Helvetica').text('This document & any information transmitted with it are confidential & intended solely for the use of the customer. Copyright © 2026 Mimi Sphere. All Rights Reserved.', { width: 515 });
+    }
 
     doc.end();
   });

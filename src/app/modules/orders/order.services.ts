@@ -239,14 +239,23 @@ const getAllOrdersFromDB = async (search?: string, status?: string) => {
 
 /* ================= SINGLE ORDER ================= */
 const getSingleOrderFromDB = async (id: string) => {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new AppError('Invalid order id', 400);
+  let order: any = null;
+
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    order = await OrderModel.findById(id);
+    if (!order) {
+      order = await SuccessOrderModel.findById(id);
+    }
   }
 
-  let order = await OrderModel.findById(id);
+  // Fallback: If not found by ObjectId or if id is an order_id string (e.g. ORD-2609002)
   if (!order) {
-    order = await SuccessOrderModel.findById(id);
+    order = await OrderModel.findOne({ order_id: id });
+    if (!order) {
+      order = await SuccessOrderModel.findOne({ order_id: id });
+    }
   }
+
   if (!order) throw new AppError('Order not found', 404);
 
   return order;

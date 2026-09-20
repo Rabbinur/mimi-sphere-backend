@@ -288,14 +288,25 @@ const singleOrderByOrderId = async (req: Request, res: Response) => {
       responseData.products = mappedProducts;
       return res.status(200).json({ success: true, data: responseData });
     } else {
-      // Return sanitized order details for tracking / analytics
+      // Return sanitized order details for success page, tracking & analytics
       return res.status(200).json({
         success: true,
         data: {
           _id: result._id,
           order_id: result.order_id,
+          customer_name: result.customer_name,
+          phone: result.phone,
+          district: result.district,
+          upazila: result.upazila,
+          village_or_area: result.village_or_area,
+          order_status: result.order_status,
+          payment_method: result.payment_method,
+          payment_status: result.payment_status,
+          delivery_charge: result.delivery_charge || 0,
+          discount_amount: result.discount_amount || 0,
           total_price: result.total_price,
           currency: 'BDT',
+          createdAt: result.createdAt,
           products: mappedProducts,
         },
       });

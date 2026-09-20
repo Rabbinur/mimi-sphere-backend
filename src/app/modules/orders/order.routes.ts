@@ -52,7 +52,6 @@ router.delete(
 
 router.get(
   '/invoice/:id',
-  verifyToken([UserRole.USER, UserRole.ADMIN]),
   OrderController.downloadInvoice,
 );
 router.get(
