@@ -57,6 +57,45 @@ class PosController {
       data: result,
     });
   });
+
+  lookupCustomer = catchAsync(async (req: Request, res: Response) => {
+    const { phone } = req.params;
+    const result = await posService.lookupCustomer(String(phone || ''));
+
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: result ? 'Customer found' : 'Customer not found',
+      data: result,
+    });
+  });
+
+  getMembersList = catchAsync(async (req: Request, res: Response) => {
+    const { search, tier, page, per_page } = req.query;
+    const result = await posService.getMembersList({
+      search: search ? String(search) : undefined,
+      tier: tier ? String(tier) : undefined,
+      page: page ? Number(page) : undefined,
+      per_page: per_page ? Number(per_page) : undefined,
+    });
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'Members fetched', data: result });
+  });
+
+  getCustomerHistory = catchAsync(async (req: Request, res: Response) => {
+    const { phone } = req.params;
+    const result = await posService.getCustomerHistory(String(phone));
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'Customer history fetched', data: result });
+  });
+
+  getMembershipSettings = catchAsync(async (_req: Request, res: Response) => {
+    const result = await posService.getMembershipSettings();
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'Membership settings fetched', data: result });
+  });
+
+  updateMembershipSettings = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.updateMembershipSettings(req.body);
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'Membership settings updated', data: result });
+  });
 }
 
 export const posController = new PosController();

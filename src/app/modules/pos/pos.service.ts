@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
+import QRCode from 'qrcode';
 import { Product } from '../products/product.model';
 import { OrderModel as Order } from '../orders/order.model';
 import { IPosOrderPayload, IPosProductItem } from './pos.interface';
+import { PosCustomer, calculateMembership } from './posCustomer.model';
+import { MembershipSettings } from './membershipSettings.model';
 import ApiError from '../../middlewares/error';
 import { HttpStatusCode } from '../../../lib/httpStatus';
 
@@ -237,6 +240,56 @@ class PosService {
       notes: payload.note || 'In-Store POS Counter Purchase',
     });
 
+    // Update or create PosCustomer record for offline customer
+    const cleanPhone = payload.customer_phone ? payload.customer_phone.trim().replace(/[\s-]/g, '') : '';
+    let customerTier = payload.membership_tier || 'Regular';
+
+    if (cleanPhone && cleanPhone.length >= 10 && cleanPhone !== '01700000000') {
+      const orderTotal = Number(payload.total) || 0;
+      let customer = await PosCustomer.findOne({ phone: cleanPhone });
+
+      if (customer) {
+        customer.total_spent = (customer.total_spent || 0) + orderTotal;
+        customer.total_orders = (customer.total_orders || 0) + 1;
+        if (payload.customer_name && payload.customer_name !== 'Walk-in Customer') {
+          customer.name = payload.customer_name;
+        }
+        if (payload.customer_email) {
+          customer.email = payload.customer_email;
+        }
+        const { tier, discountPercent } = calculateMembership(customer.total_spent);
+        customer.membership_tier = tier;
+        customer.discount_percent = discountPercent;
+        customer.last_purchase_at = new Date();
+        await customer.save();
+        customerTier = customer.membership_tier;
+      } else {
+        const { tier, discountPercent } = calculateMembership(orderTotal);
+        customer = await PosCustomer.create({
+          name: payload.customer_name || 'Walk-in Customer',
+          phone: cleanPhone,
+          email: payload.customer_email,
+          total_spent: orderTotal,
+          total_orders: 1,
+          membership_tier: tier,
+          discount_percent: discountPercent,
+          last_purchase_at: new Date(),
+        });
+        customerTier = customer.membership_tier;
+      }
+    }
+
+    // Generate QR Code for thermal receipt
+    let thermalQrCode = '';
+    try {
+      thermalQrCode = await QRCode.toDataURL('https://www.mimisphere.com', {
+        margin: 1,
+        width: 140,
+      });
+    } catch (err) {
+      // Fallback
+    }
+
     const receiptData = {
       receipt_number: receiptNumber,
       order_number: orderNumber,
@@ -248,6 +301,7 @@ class PosService {
       customer_name: payload.customer_name || 'Walk-in Customer',
       customer_phone: payload.customer_phone || '',
       customer_email: payload.customer_email || '',
+      membership_tier: customerTier,
       items: payload.items,
       subtotal: payload.subtotal,
       discount: payload.discount || 0,
@@ -256,9 +310,56 @@ class PosService {
       payment_method: payload.payment_method,
       tendered_amount: payload.tendered_amount || payload.total,
       change_amount: payload.change_amount || 0,
+      qr_code: thermalQrCode,
     };
 
     return receiptData;
+  }
+
+  // 4. Customer Lookup by Phone for POS Membership
+  async lookupCustomer(phone: string) {
+    const cleanPhone = phone ? phone.trim().replace(/[\s-]/g, '') : '';
+    if (!cleanPhone || cleanPhone.length < 10) {
+      throw new ApiError(HttpStatusCode.BAD_REQUEST, 'A valid 11-digit phone number is required');
+    }
+
+    // 1. Search in PosCustomer
+    let customer = await PosCustomer.findOne({ phone: cleanPhone });
+
+    // 2. If not found in PosCustomer, check if customer made past orders in OrderModel
+    if (!customer) {
+      const pastOrders = await Order.find({ phone: cleanPhone, payment_status: 'paid' }).lean();
+      if (pastOrders.length > 0) {
+        const pastSpent = pastOrders.reduce((sum, o: any) => sum + (o.total_price || 0), 0);
+        const latestOrder = pastOrders[pastOrders.length - 1];
+        const { tier, discountPercent } = calculateMembership(pastSpent);
+
+        customer = await PosCustomer.create({
+          phone: cleanPhone,
+          name: latestOrder?.customer_name || 'Walk-in Customer',
+          email: latestOrder?.email,
+          total_spent: pastSpent,
+          total_orders: pastOrders.length,
+          membership_tier: tier,
+          discount_percent: discountPercent,
+          last_purchase_at: latestOrder.createdAt,
+        });
+      }
+    }
+
+    if (customer) {
+      // Re-calculate tier in case spent exceeded threshold
+      const { tier, discountPercent } = calculateMembership(customer.total_spent);
+      if (customer.membership_tier !== tier || customer.discount_percent !== discountPercent) {
+        customer.membership_tier = tier;
+        customer.discount_percent = discountPercent;
+        await customer.save();
+      }
+      return customer;
+    }
+
+    // Customer not found in DB
+    return null;
   }
 
   // 4. Daily Shift Sales Summary
@@ -310,6 +411,98 @@ class PosService {
       total_discount: totalDiscount,
       total_items_sold: totalItemsSold,
     };
+  }
+
+  // ── Membership Settings ──────────────────────────────────────────
+  async getMembershipSettings() {
+    let settings = await MembershipSettings.findOne().lean();
+    if (!settings) {
+      // Return defaults without saving
+      return {
+        silver_threshold: 1000,
+        silver_discount: 5,
+        gold_threshold: 3500,
+        gold_discount: 7,
+      };
+    }
+    return settings;
+  }
+
+  async updateMembershipSettings(data: {
+    silver_threshold: number;
+    silver_discount: number;
+    gold_threshold: number;
+    gold_discount: number;
+  }) {
+    const settings = await MembershipSettings.findOneAndUpdate(
+      {},
+      { $set: data },
+      { new: true, upsert: true, runValidators: true }
+    ).lean();
+
+    // Re-calculate all existing customers with new thresholds
+    const allCustomers = await PosCustomer.find({}).lean();
+    const bulkOps = allCustomers.map((c) => {
+      let tier: 'Regular' | 'Silver' | 'Gold' = 'Regular';
+      let discount = 0;
+      if (c.total_spent >= data.gold_threshold) {
+        tier = 'Gold'; discount = data.gold_discount;
+      } else if (c.total_spent >= data.silver_threshold) {
+        tier = 'Silver'; discount = data.silver_discount;
+      }
+      return {
+        updateOne: {
+          filter: { _id: c._id },
+          update: { $set: { membership_tier: tier, discount_percent: discount } },
+        },
+      };
+    });
+    if (bulkOps.length > 0) await PosCustomer.bulkWrite(bulkOps);
+
+    return settings;
+  }
+
+  // ── Members List ──────────────────────────────────────────────────
+  async getMembersList(query: {
+    search?: string;
+    tier?: string;
+    page?: number;
+    per_page?: number;
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.per_page) || 20;
+    const skip = (page - 1) * limit;
+
+    const filter: any = {};
+    if (query.tier && query.tier !== 'All') filter.membership_tier = query.tier;
+    if (query.search) {
+      const re = new RegExp(query.search, 'i');
+      filter.$or = [{ name: re }, { phone: re }];
+    }
+
+    const [customers, total] = await Promise.all([
+      PosCustomer.find(filter)
+        .sort({ total_spent: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PosCustomer.countDocuments(filter),
+    ]);
+
+    return { customers, total, page, per_page: limit, total_pages: Math.ceil(total / limit) };
+  }
+
+  // ── Customer Purchase History ─────────────────────────────────────
+  async getCustomerHistory(phone: string) {
+    const customer = await PosCustomer.findOne({ phone }).lean();
+    if (!customer) throw new ApiError(HttpStatusCode.NOT_FOUND, 'Customer not found');
+
+    const orders = await Order.find({ customer_phone: phone, source: 'pos' })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    return { customer, orders };
   }
 }
 

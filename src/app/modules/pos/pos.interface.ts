@@ -52,4 +52,25 @@ export interface IPosOrderPayload {
   tendered_amount?: number;
   change_amount?: number;
   note?: string;
+  membership_tier?: string;
+}
+
+export interface IPosReceiptData {
+  receipt_number: string;
+  order_number: string;
+  order_id: string;
+  created_at: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  membership_tier?: string;
+  items: IPosCartItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  payment_method: string;
+  tendered_amount: number;
+  change_amount: number;
+  qr_code?: string;
 }

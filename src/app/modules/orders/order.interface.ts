@@ -77,4 +77,8 @@ export type TOrder = {
     external_id?: string;
   };
   is_purchase_event_fired?: boolean;
+
+  /* -------- Timestamps (added by Mongoose) -------- */
+  createdAt?: Date;
+  updatedAt?: Date;
 };

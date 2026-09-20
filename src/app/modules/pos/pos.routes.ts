@@ -4,10 +4,16 @@ import verifyToken from '../../middlewares/verifyToken';
 import { UserRole } from '../users/user.constant';
 
 const router = express.Router();
+const admin = verifyToken([UserRole.ADMIN]);
 
-router.get('/products', verifyToken([UserRole.ADMIN]), posController.getPosProducts);
-router.get('/scan', verifyToken([UserRole.ADMIN]), posController.scanBarcode);
-router.post('/orders', verifyToken([UserRole.ADMIN]), posController.createPosOrder);
-router.get('/shift-summary', verifyToken([UserRole.ADMIN]), posController.getPosShiftSummary);
+router.get('/products',               admin, posController.getPosProducts);
+router.get('/scan',                   admin, posController.scanBarcode);
+router.post('/orders',                admin, posController.createPosOrder);
+router.get('/customer/:phone',        admin, posController.lookupCustomer);
+router.get('/customer/:phone/history',admin, posController.getCustomerHistory);
+router.get('/shift-summary',          admin, posController.getPosShiftSummary);
+router.get('/members',                admin, posController.getMembersList);
+router.get('/membership-settings',    admin, posController.getMembershipSettings);
+router.put('/membership-settings',    admin, posController.updateMembershipSettings);
 
 export const PosRoutes = router;
