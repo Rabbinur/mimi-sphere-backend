@@ -56,6 +56,17 @@ export interface FeaturedCollectionsCMS {
   subtitle?: string;
 }
 
+export interface ExitIntentPopupCMS {
+  isEnabled: boolean;
+  title: string;
+  subtitle: string;
+  voucherCode: string;
+  discountText: string;
+  expiryMinutes: number;
+  ctaText: string;
+  declineText: string;
+}
+
 export interface CMS {
   company: Company;
   social: Social;
@@ -64,4 +75,5 @@ export interface CMS {
   heroFeatures: HeroFeature[];
   bentoGrid?: BentoGridCMS;
   featuredCollections?: FeaturedCollectionsCMS;
+  exitIntentPopup?: ExitIntentPopupCMS;
 }

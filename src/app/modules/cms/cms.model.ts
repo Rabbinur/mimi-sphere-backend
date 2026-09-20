@@ -64,6 +64,16 @@ const CMSchema = new Schema<CMS>(
       title: { type: String, default: 'Featured Collections' },
       subtitle: { type: String, default: 'Explore our curated collections' },
     },
+    exitIntentPopup: {
+      isEnabled: { type: Boolean, default: true },
+      title: { type: String, default: 'WAIT! GET 5% OFF NOW' },
+      subtitle: { type: String, default: 'Complete your order now and save instantly!' },
+      voucherCode: { type: String, default: 'SAVE05' },
+      discountText: { type: String, default: '5% OFF' },
+      expiryMinutes: { type: Number, default: 5 },
+      ctaText: { type: String, default: 'CLAIM DISCOUNT' },
+      declineText: { type: String, default: "I'll pay full price" },
+    },
   },
   { timestamps: true },
 );
