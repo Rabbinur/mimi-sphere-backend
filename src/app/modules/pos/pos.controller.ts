@@ -48,7 +48,7 @@ class PosController {
   });
 
   getPosShiftSummary = catchAsync(async (req: Request, res: Response) => {
-    const result = await posService.getPosShiftSummary();
+    const result = await posService.getPosShiftSummary(req.query);
 
     sendResponse(res, {
       statusCode: HttpStatusCode.OK,
@@ -128,6 +128,43 @@ class PosController {
       per_page: per_page ? Number(per_page) : undefined,
     });
     sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'POS transactions retrieved successfully', data: result });
+  });
+
+  updatePosTransaction = catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await posService.updatePosTransaction(id, req.body);
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'POS transaction updated successfully', data: result });
+  });
+
+  createPosExpense = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.createPosExpense(req.body);
+    sendResponse(res, {
+      statusCode: HttpStatusCode.CREATED,
+      success: true,
+      message: 'Expense added successfully',
+      data: result,
+    });
+  });
+
+  getPosExpenses = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.getPosExpenses(req.query);
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: 'Expenses retrieved successfully',
+      data: result,
+    });
+  });
+
+  deletePosExpense = catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await posService.deletePosExpense(id);
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: 'Expense deleted successfully',
+      data: result,
+    });
   });
 }
 

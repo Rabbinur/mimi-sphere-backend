@@ -16,7 +16,11 @@ router.get('/last-receipt',           admin, posController.getLastReceipt);
 router.get('/members',                admin, posController.getMembersList);
 router.get('/orders-list',            admin, posController.getPosOrdersList);
 router.get('/transactions',           admin, posController.getPosTransactions);
+router.patch('/transactions/:id',     admin, posController.updatePosTransaction);
 router.get('/membership-settings',    admin, posController.updateMembershipSettings);
 router.put('/membership-settings',    admin, posController.updateMembershipSettings);
+router.post('/expenses',              admin, posController.createPosExpense);
+router.get('/expenses',               admin, posController.getPosExpenses);
+router.delete('/expenses/:id',        admin, posController.deletePosExpense);
 
 export const PosRoutes = router;

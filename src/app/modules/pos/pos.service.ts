@@ -5,6 +5,8 @@ import { OrderModel as Order } from '../orders/order.model';
 import { IPosOrderPayload, IPosProductItem } from './pos.interface';
 import { PosCustomer, calculateMembership } from './posCustomer.model';
 import { MembershipSettings } from './membershipSettings.model';
+import { PosExpense } from './posExpense.model';
+import { PosStockAdjustment } from './posStockAdjustment.model';
 import ApiError from '../../middlewares/error';
 import { HttpStatusCode } from '../../../lib/httpStatus';
 
@@ -362,27 +364,87 @@ class PosService {
     return null;
   }
 
-  // 4. Daily Shift Sales Summary (100% Dynamic Backend Data)
-  async getPosShiftSummary() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+  // 4. Daily Shift Sales & Profit Summary (100% Dynamic Backend Data)
+  async getPosShiftSummary(query?: {
+    channel?: string; // 'all' | 'pos' | 'online'
+    order_type?: string;
+    date?: string; // YYYY-MM-DD
+  }) {
+    // 1. Calculate Start and End of Day (respecting GMT+6 BST or provided date)
+    let startOfDay: Date;
+    let endOfDay: Date;
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    if (query?.date) {
+      startOfDay = new Date(`${query.date}T00:00:00.000+06:00`);
+      endOfDay = new Date(`${query.date}T23:59:59.999+06:00`);
+      if (isNaN(startOfDay.getTime())) {
+        const now = new Date();
+        startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      }
+    } else {
+      const now = new Date();
+      // Bangladesh Standard Time is UTC+6
+      const bstOffset = 6 * 60 * 60 * 1000;
+      const bstNow = new Date(now.getTime() + bstOffset);
+      const year = bstNow.getUTCFullYear();
+      const month = String(bstNow.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(bstNow.getUTCDate()).padStart(2, '0');
 
-    const orders = await Order.find({
-      order_type: 'POS',
+      startOfDay = new Date(`${year}-${month}-${day}T00:00:00.000+06:00`);
+      endOfDay = new Date(`${year}-${month}-${day}T23:59:59.999+06:00`);
+    }
+
+    // 2. Build order filters for channel
+    const channel = (query?.channel || query?.order_type || 'all').toLowerCase();
+    const orderFilter: any = {
       createdAt: { $gte: startOfDay, $lte: endOfDay },
-    }).lean();
+    };
+
+    if (channel === 'pos') {
+      orderFilter.order_type = 'POS';
+    } else if (channel === 'online') {
+      orderFilter.order_type = 'ONLINE';
+    }
+
+    // Fetch orders, returns, expenses, and adjustments in parallel
+    const [orders, allTodayOrders, returnOrders, todayExpenses, todayStockAdjustments] = await Promise.all([
+      Order.find(orderFilter).lean(),
+      Order.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } }).lean(),
+      Order.find({
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        $or: [{ order_status: 'returned' }, { payment_status: 'refunded' }],
+      }).lean(),
+      PosExpense.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+      }).lean(),
+      PosStockAdjustment.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+      }).lean(),
+    ]);
 
     let totalSales = 0;
     let cashSales = 0;
     let cardSales = 0;
     let digitalSales = 0;
+    let posSales = 0;
+    let onlineSales = 0;
     let totalDiscount = 0;
     let totalItemsSold = 0;
+    let totalShippingCost = 0;
+    let depositPayment = 0;
 
-    // Collect all product IDs from today's orders to calculate actual product cost
+    // Separate counts across channels from all today's orders
+    allTodayOrders.forEach((o: any) => {
+      const price = Number(o.total_price || 0);
+      if (String(o.order_type).toUpperCase() === 'POS') {
+        posSales += price;
+      } else {
+        onlineSales += price;
+      }
+    });
+
+    // Collect all product IDs from matching orders to calculate actual product cost
     const productIds = new Set<string>();
     orders.forEach((o: any) => {
       const items = o.products || o.items || [];
@@ -396,11 +458,18 @@ class PosService {
     });
 
     const productsDb = productIds.size > 0
-      ? await Product.find({ _id: { $in: Array.from(productIds) } }, { cost_price: 1, product_price: 1 }).lean()
+      ? await Product.find({ _id: { $in: Array.from(productIds) } }, { cost_price: 1, product_price: 1, product_variants: 1 }).lean()
       : [];
     const costMap = new Map<string, number>();
     productsDb.forEach((p: any) => {
       costMap.set(String(p._id), Number(p.cost_price || 0));
+      if (Array.isArray(p.product_variants)) {
+        p.product_variants.forEach((v: any) => {
+          if (v._id) {
+            costMap.set(String(v._id), Number(v.cost_price ?? p.cost_price ?? 0));
+          }
+        });
+      }
     });
 
     let totalProductCost = 0;
@@ -409,12 +478,15 @@ class PosService {
       const orderTotal = Number(o.total_price || 0);
       totalSales += orderTotal;
       totalDiscount += Number(o.discount_amount || o.discount || 0);
+      totalShippingCost += Number(o.delivery_charge || 0);
 
       const pm = String(o.payment_method || '').toUpperCase();
       if (pm.includes('CASH')) {
         cashSales += orderTotal;
       } else if (pm.includes('CARD')) {
         cardSales += orderTotal;
+      } else if (pm.includes('DEPOSIT')) {
+        depositPayment += orderTotal;
       } else {
         digitalSales += orderTotal;
       }
@@ -424,11 +496,21 @@ class PosService {
         productsList.forEach((it: any) => {
           const qty = Number(it.quantity || 1);
           totalItemsSold += qty;
-          const unitCost = costMap.get(String(it.product_id)) ?? (Number(it.price || 0) * 0.7);
+          const matchedCost = (it.variant_id && costMap.get(String(it.variant_id))) || costMap.get(String(it.product_id));
+          const unitCost = matchedCost !== undefined && matchedCost > 0 ? matchedCost : (Number(it.price || 0) * 0.7);
           totalProductCost += unitCost * qty;
         });
       }
     });
+
+    // Real returns today
+    const totalReturns = returnOrders.reduce((sum: number, o: any) => sum + Number(o.total_price || 0), 0);
+
+    // Real expenses today
+    const totalExpense = todayExpenses.reduce((sum: number, exp: any) => sum + Number(exp.amount || 0), 0);
+
+    // Real stock adjustments today
+    const totalStockAdjustment = todayStockAdjustments.reduce((sum: number, adj: any) => sum + Number(adj.cost_value || 0), 0);
 
     // Calculate real closing inventory stock value from Product model
     let closingStock = 0;
@@ -462,24 +544,35 @@ class PosService {
       closingStock = 0;
     }
 
-    const netProfit = Math.max(0, totalSales - totalProductCost);
+    // Net Profit = Revenue - Product Cost - Expenses - Returns
+    const netProfit = Math.max(0, totalSales - totalProductCost - totalExpense - totalReturns);
 
     return {
       date: new Date().toISOString().split('T')[0],
+      channel: channel,
       total_orders: orders.length,
       total_sales: Math.round(totalSales * 100) / 100,
+      product_revenue: Math.round(totalSales * 100) / 100,
       cash_sales: Math.round(cashSales * 100) / 100,
       card_sales: Math.round(cardSales * 100) / 100,
       digital_sales: Math.round(digitalSales * 100) / 100,
+      pos_sales: Math.round(posSales * 100) / 100,
+      online_sales: Math.round(onlineSales * 100) / 100,
       total_discount: Math.round(totalDiscount * 100) / 100,
+      total_sell_discount: Math.round(totalDiscount * 100) / 100,
       total_items_sold: totalItemsSold,
       product_cost: Math.round(totalProductCost * 100) / 100,
       net_profit: Math.round(netProfit * 100) / 100,
+      total_profit: Math.round(netProfit * 100) / 100,
       closing_stock: Math.round(closingStock * 100) / 100,
-      cash_in_hand: Math.round(cashSales * 100) / 100,
+      cash_in_hand: Math.round(Math.max(0, cashSales - totalExpense) * 100) / 100,
       total_payment: Math.round(totalSales * 100) / 100,
-      total_expense: 0,
-      total_returns: 0,
+      total_expense: Math.round(totalExpense * 100) / 100,
+      total_returns: Math.round(totalReturns * 100) / 100,
+      total_sell_return: Math.round(totalReturns * 100) / 100,
+      total_stock_adjustment: Math.round(totalStockAdjustment * 100) / 100,
+      deposit_payment: Math.round(depositPayment * 100) / 100,
+      total_purchase_shipping_cost: Math.round(totalShippingCost * 100) / 100,
     };
   }
 
@@ -813,6 +906,68 @@ class PosService {
       per_page: limit,
       total_pages: Math.ceil(total / limit) || 1,
     };
+  }
+
+  async updatePosTransaction(id: string, payload: {
+    customer_name?: string;
+    customer_phone?: string;
+    payment_method?: string;
+    payment_status?: string;
+    order_status?: string;
+  }) {
+    const updateData: any = {};
+    if (payload.customer_name !== undefined) updateData.customer_name = payload.customer_name;
+    if (payload.customer_phone !== undefined) updateData.phone = payload.customer_phone;
+    if (payload.payment_method !== undefined) updateData.payment_method = payload.payment_method;
+    if (payload.payment_status !== undefined) updateData.payment_status = payload.payment_status;
+    if (payload.order_status !== undefined) updateData.order_status = payload.order_status;
+
+    const updatedOrder = await Order.findByIdAndUpdate(id, updateData, { new: true }).lean();
+    if (!updatedOrder) {
+      throw new ApiError(HttpStatusCode.NOT_FOUND, 'Transaction not found');
+    }
+    return updatedOrder;
+  }
+
+  // ── 9. POS Expenses Management ──
+  async createPosExpense(payload: {
+    title: string;
+    amount: number;
+    category?: string;
+    notes?: string;
+    date?: string;
+    created_by?: string;
+  }) {
+    if (!payload.title || !payload.amount) {
+      throw new ApiError(HttpStatusCode.BAD_REQUEST, 'Title and amount are required');
+    }
+    const expense = await PosExpense.create({
+      title: payload.title.trim(),
+      amount: Number(payload.amount),
+      category: payload.category || 'General',
+      notes: payload.notes || '',
+      date: payload.date ? new Date(payload.date) : new Date(),
+      created_by: payload.created_by || 'Admin',
+    });
+    return expense;
+  }
+
+  async getPosExpenses(query?: { date?: string }) {
+    const filter: any = {};
+    if (query?.date) {
+      const start = new Date(`${query.date}T00:00:00.000+06:00`);
+      const end = new Date(`${query.date}T23:59:59.999+06:00`);
+      filter.date = { $gte: start, $lte: end };
+    }
+    return PosExpense.find(filter).sort({ createdAt: -1 }).lean();
+  }
+
+  async deletePosExpense(id: string) {
+    const deleted = await PosExpense.findByIdAndDelete(id).lean();
+    if (!deleted) {
+      throw new ApiError(HttpStatusCode.NOT_FOUND, 'Expense not found');
+    }
+    return deleted;
   }
 }
 
