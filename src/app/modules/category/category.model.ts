@@ -10,6 +10,7 @@ const CategorySchema = new Schema<TCategory>(
         imageUrl: { type: String },
         bannerImage: { type: String, default: undefined },
         isActive: { type: Boolean, default: true },
+        showInNavbar: { type: Boolean, default: true },
         order: { type: Number, default: 0 },
     },
     {

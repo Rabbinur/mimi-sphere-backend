@@ -34,6 +34,10 @@ const createCategory = async (req: Request, res: Response): Promise<void> => {
       categoryData.isActive = Boolean(categoryData.isActive);
     }
 
+    if (categoryData.showInNavbar !== undefined) {
+      categoryData.showInNavbar = Boolean(categoryData.showInNavbar);
+    }
+
     // Prevent duplicate category names
     const exists = await CategoryModel.findOne({ name: categoryData.name });
     if (exists) {
@@ -93,8 +97,15 @@ const getAllCategories = async (req: Request, res: Response): Promise<void> => {
     isActive = false;
   }
 
+  let showInNavbar: boolean | undefined = undefined;
+  if (req.query.showInNavbar === 'true') {
+    showInNavbar = true;
+  } else if (req.query.showInNavbar === 'false') {
+    showInNavbar = false;
+  }
+
   try {
-    const categories = await categoryServices.getAllCategories(subCategory, isActive);
+    const categories = await categoryServices.getAllCategories(subCategory, isActive, showInNavbar);
 
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -127,6 +138,14 @@ const updateCategory = async (req: Request, res: Response): Promise<void> => {
         return;
       }
       categoryData.order = parsedOrder;
+    }
+
+    if (categoryData.isActive !== undefined) {
+      categoryData.isActive = Boolean(categoryData.isActive);
+    }
+
+    if (categoryData.showInNavbar !== undefined) {
+      categoryData.showInNavbar = Boolean(categoryData.showInNavbar);
     }
 
     if (categoryData.name) {

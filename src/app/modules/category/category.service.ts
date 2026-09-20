@@ -43,17 +43,26 @@ const sortCategoriesByOrder = <T extends { order?: number; createdAt?: Date | st
 const getAllCategories = async (
   subCategory: boolean,
   isActive?: boolean,
+  showInNavbar?: boolean,
 ): Promise<TCategory[]> => {
   try {
-    const filter: Record<string, any> = {};
+    const andConditions: any[] = [];
     if (isActive === true) {
-      filter.$or = [{ isActive: true }, { isActive: { $exists: false } }];
+      andConditions.push({ $or: [{ isActive: true }, { isActive: { $exists: false } }] });
     } else if (isActive === false) {
-      filter.isActive = false;
+      andConditions.push({ isActive: false });
     }
 
+    if (showInNavbar === true) {
+      andConditions.push({ $or: [{ showInNavbar: true }, { showInNavbar: { $exists: false } }] });
+    } else if (showInNavbar === false) {
+      andConditions.push({ showInNavbar: false });
+    }
+
+    const filter: Record<string, any> = andConditions.length > 0 ? { $and: andConditions } : {};
+
     const rawCategories: TCategory[] = await CategoryModel.find(filter)
-      .select('_id name slug description imageUrl bannerImage parent_category_id isActive createdAt order')
+      .select('_id name slug description imageUrl bannerImage parent_category_id isActive showInNavbar createdAt order')
       .sort({ order: 1, createdAt: 1 })
       .lean();
 

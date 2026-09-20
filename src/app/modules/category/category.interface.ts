@@ -9,6 +9,7 @@ export interface TCategory {
     imageUrl?: string;
     bannerImage?: string;
     isActive?: boolean;
+    showInNavbar?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
     sub_categories?: TCategory[];
