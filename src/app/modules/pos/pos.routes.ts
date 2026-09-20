@@ -14,7 +14,9 @@ router.get('/customer/:phone/history',admin, posController.getCustomerHistory);
 router.get('/shift-summary',          admin, posController.getPosShiftSummary);
 router.get('/last-receipt',           admin, posController.getLastReceipt);
 router.get('/members',                admin, posController.getMembersList);
-router.get('/membership-settings',    admin, posController.getMembershipSettings);
+router.get('/orders-list',            admin, posController.getPosOrdersList);
+router.get('/transactions',           admin, posController.getPosTransactions);
+router.get('/membership-settings',    admin, posController.updateMembershipSettings);
 router.put('/membership-settings',    admin, posController.updateMembershipSettings);
 
 export const PosRoutes = router;

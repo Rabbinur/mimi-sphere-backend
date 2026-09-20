@@ -657,6 +657,163 @@ class PosService {
 
     return { customer, orders };
   }
+
+  // ── 7. Get POS Orders List (Matching Image 2 Tabs: Onhold, Unpaid, Paid) ──
+  async getPosOrdersList(query: {
+    status?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.per_page) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: any = { order_type: 'POS' };
+
+    if (query.status && query.status !== 'all') {
+      if (query.status === 'paid') {
+        filter.payment_status = 'paid';
+      } else if (query.status === 'unpaid') {
+        filter.payment_status = { $in: ['pending', 'failed'] };
+      } else if (query.status === 'onhold') {
+        filter.order_status = { $in: ['pending', 'processing'] };
+      }
+    }
+
+    if (query.search) {
+      const searchRe = new RegExp(query.search.trim(), 'i');
+      filter.$or = [
+        { order_id: searchRe },
+        { customer_name: searchRe },
+        { phone: searchRe },
+        { 'products.title': searchRe },
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .select('order_id customer_name phone email total_price discount_amount payment_status payment_method order_status notes products createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(filter),
+    ]);
+
+    const formattedOrders = orders.map((o: any) => ({
+      _id: o._id,
+      order_id: o.order_id,
+      cashier: 'admin',
+      customer: o.customer_name || 'Walk-in Customer',
+      customer_phone: o.phone || '',
+      customer_email: o.email || '',
+      total: Number(o.total_price || 0),
+      discount: Number(o.discount_amount || 0),
+      payment_status: o.payment_status || 'paid',
+      payment_method: o.payment_method || 'POS_CASH',
+      order_status: o.order_status || 'delivered',
+      date: new Date(o.createdAt || Date.now()).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }),
+      note: o.notes || '',
+      items_count: (o.products || []).reduce((sum: number, it: any) => sum + (it.quantity || 1), 0),
+      products: (o.products || []).map((it: any) => ({
+        product_id: it.product_id,
+        variant_id: it.variant_id,
+        title: it.title,
+        price: it.price,
+        quantity: it.quantity,
+        total_price: it.total_price || (it.price * it.quantity),
+      })),
+    }));
+
+    return {
+      orders: formattedOrders,
+      total,
+      page,
+      per_page: limit,
+      total_pages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  // ── 8. Get Recent POS Transactions (Matching Image 3 Tabs: Purchase, Payment, Return) ──
+  async getPosTransactions(query: {
+    type?: string;
+    search?: string;
+    page?: number;
+    per_page?: number;
+  }) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.per_page) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: any = { order_type: 'POS' };
+
+    if (query.type && query.type !== 'all') {
+      if (query.type === 'purchase' || query.type === 'payment') {
+        filter.payment_status = 'paid';
+      } else if (query.type === 'return') {
+        filter.order_status = { $in: ['returned', 'refunded'] };
+      }
+    }
+
+    if (query.search) {
+      const searchRe = new RegExp(query.search.trim(), 'i');
+      filter.$or = [
+        { order_id: searchRe },
+        { customer_name: searchRe },
+        { phone: searchRe },
+        { payment_method: searchRe },
+      ];
+    }
+
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .select('order_id customer_name phone total_price payment_method payment_status order_status createdAt products')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(filter),
+    ]);
+
+    const transactions = orders.map((o: any) => ({
+      _id: o._id,
+      customer_name: o.customer_name || 'Walk-in Customer',
+      customer_phone: o.phone || '',
+      reference: o.order_id,
+      date: new Date(o.createdAt || Date.now()).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+      time: new Date(o.createdAt || Date.now()).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      amount: Number(o.total_price || 0),
+      payment_method: o.payment_method || 'POS_CASH',
+      payment_status: o.payment_status || 'paid',
+      order_status: o.order_status || 'delivered',
+      items_count: (o.products || []).reduce((sum: number, it: any) => sum + (it.quantity || 1), 0),
+      products: o.products || [],
+    }));
+
+    return {
+      transactions,
+      total,
+      page,
+      per_page: limit,
+      total_pages: Math.ceil(total / limit) || 1,
+    };
+  }
 }
 
 export const posService = new PosService();

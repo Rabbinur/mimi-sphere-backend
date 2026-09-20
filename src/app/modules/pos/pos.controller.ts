@@ -107,6 +107,28 @@ class PosController {
     const result = await posService.updateMembershipSettings(req.body);
     sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'Membership settings updated', data: result });
   });
+
+  getPosOrdersList = catchAsync(async (req: Request, res: Response) => {
+    const { status, search, page, per_page } = req.query;
+    const result = await posService.getPosOrdersList({
+      status: status ? String(status) : undefined,
+      search: search ? String(search) : undefined,
+      page: page ? Number(page) : undefined,
+      per_page: per_page ? Number(per_page) : undefined,
+    });
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'POS orders retrieved successfully', data: result });
+  });
+
+  getPosTransactions = catchAsync(async (req: Request, res: Response) => {
+    const { type, search, page, per_page } = req.query;
+    const result = await posService.getPosTransactions({
+      type: type ? String(type) : undefined,
+      search: search ? String(search) : undefined,
+      page: page ? Number(page) : undefined,
+      per_page: per_page ? Number(per_page) : undefined,
+    });
+    sendResponse(res, { statusCode: HttpStatusCode.OK, success: true, message: 'POS transactions retrieved successfully', data: result });
+  });
 }
 
 export const posController = new PosController();
