@@ -58,6 +58,17 @@ class PosController {
     });
   });
 
+  getLastReceipt = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.getLastReceipt();
+
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: result ? 'Last POS receipt retrieved successfully' : 'No previous POS receipt found',
+      data: result,
+    });
+  });
+
   lookupCustomer = catchAsync(async (req: Request, res: Response) => {
     const { phone } = req.params;
     const result = await posService.lookupCustomer(String(phone || ''));

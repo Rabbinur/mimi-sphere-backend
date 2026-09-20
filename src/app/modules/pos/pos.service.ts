@@ -362,7 +362,7 @@ class PosService {
     return null;
   }
 
-  // 4. Daily Shift Sales Summary
+  // 4. Daily Shift Sales Summary (100% Dynamic Backend Data)
   async getPosShiftSummary() {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -382,35 +382,186 @@ class PosService {
     let totalDiscount = 0;
     let totalItemsSold = 0;
 
+    // Collect all product IDs from today's orders to calculate actual product cost
+    const productIds = new Set<string>();
     orders.forEach((o: any) => {
-      totalSales += o.total_price || 0;
-      totalDiscount += o.discount || 0;
-
-      if (o.payment_method === 'cash') {
-        cashSales += o.total_price || 0;
-      } else if (o.payment_method === 'card') {
-        cardSales += o.total_price || 0;
-      } else {
-        digitalSales += o.total_price || 0;
-      }
-
-      if (Array.isArray(o.items)) {
-        o.items.forEach((it: any) => {
-          totalItemsSold += it.quantity || 1;
+      const items = o.products || o.items || [];
+      if (Array.isArray(items)) {
+        items.forEach((it: any) => {
+          if (it.product_id && mongoose.isValidObjectId(it.product_id)) {
+            productIds.add(String(it.product_id));
+          }
         });
       }
     });
 
+    const productsDb = productIds.size > 0
+      ? await Product.find({ _id: { $in: Array.from(productIds) } }, { cost_price: 1, product_price: 1 }).lean()
+      : [];
+    const costMap = new Map<string, number>();
+    productsDb.forEach((p: any) => {
+      costMap.set(String(p._id), Number(p.cost_price || 0));
+    });
+
+    let totalProductCost = 0;
+
+    orders.forEach((o: any) => {
+      const orderTotal = Number(o.total_price || 0);
+      totalSales += orderTotal;
+      totalDiscount += Number(o.discount_amount || o.discount || 0);
+
+      const pm = String(o.payment_method || '').toUpperCase();
+      if (pm.includes('CASH')) {
+        cashSales += orderTotal;
+      } else if (pm.includes('CARD')) {
+        cardSales += orderTotal;
+      } else {
+        digitalSales += orderTotal;
+      }
+
+      const productsList = o.products || o.items || [];
+      if (Array.isArray(productsList)) {
+        productsList.forEach((it: any) => {
+          const qty = Number(it.quantity || 1);
+          totalItemsSold += qty;
+          const unitCost = costMap.get(String(it.product_id)) ?? (Number(it.price || 0) * 0.7);
+          totalProductCost += unitCost * qty;
+        });
+      }
+    });
+
+    // Calculate real closing inventory stock value from Product model
+    let closingStock = 0;
+    try {
+      const inventoryStock = await Product.aggregate([
+        {
+          $project: {
+            stockValue: {
+              $multiply: [
+                { $ifNull: ['$quantity', 0] },
+                {
+                  $cond: [
+                    { $gt: ['$cost_price', 0] },
+                    '$cost_price',
+                    { $ifNull: ['$product_price', 0] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalClosingStock: { $sum: '$stockValue' },
+          },
+        },
+      ]);
+      closingStock = inventoryStock[0]?.totalClosingStock || 0;
+    } catch (err) {
+      closingStock = 0;
+    }
+
+    const netProfit = Math.max(0, totalSales - totalProductCost);
+
     return {
       date: new Date().toISOString().split('T')[0],
       total_orders: orders.length,
-      total_sales: totalSales,
-      cash_sales: cashSales,
-      card_sales: cardSales,
-      digital_sales: digitalSales,
-      total_discount: totalDiscount,
+      total_sales: Math.round(totalSales * 100) / 100,
+      cash_sales: Math.round(cashSales * 100) / 100,
+      card_sales: Math.round(cardSales * 100) / 100,
+      digital_sales: Math.round(digitalSales * 100) / 100,
+      total_discount: Math.round(totalDiscount * 100) / 100,
       total_items_sold: totalItemsSold,
+      product_cost: Math.round(totalProductCost * 100) / 100,
+      net_profit: Math.round(netProfit * 100) / 100,
+      closing_stock: Math.round(closingStock * 100) / 100,
+      cash_in_hand: Math.round(cashSales * 100) / 100,
+      total_payment: Math.round(totalSales * 100) / 100,
+      total_expense: 0,
+      total_returns: 0,
     };
+  }
+
+  // 5. Get Latest / Last POS Order Receipt
+  async getLastReceipt() {
+    const order = await Order.findOne({ order_type: 'POS' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!order) {
+      return null;
+    }
+
+    let thermalQrCode = '';
+    try {
+      thermalQrCode = await QRCode.toDataURL('https://www.mimisphere.com', {
+        margin: 1,
+        width: 140,
+      });
+    } catch (err) {}
+
+    const receiptNumber = order.order_id || String(order._id).slice(-6).toUpperCase();
+    const orderNumber = order.order_id || String(order._id).slice(-8).toUpperCase();
+
+    // Fetch membership tier if available for this customer
+    let membershipTier = 'Regular';
+    let discountPercent = 0;
+    if (order.phone) {
+      const posCustomer = await PosCustomer.findOne({ phone: order.phone }).lean();
+      if (posCustomer) {
+        membershipTier = posCustomer.membership_tier || 'Regular';
+        discountPercent = posCustomer.discount_percent || 0;
+      }
+    }
+
+    const discount = Number(order.discount_amount || 0);
+    const total = Number(order.total_price || 0);
+    const subtotal = total + discount;
+
+    const receiptData = {
+      receipt_number: receiptNumber,
+      order_number: orderNumber,
+      order_id: String(order._id),
+      created_at: new Date(order.createdAt || Date.now()).toLocaleString('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      customer_name: order.customer_name || 'Walk-in Customer',
+      customer_phone: order.phone || '',
+      customer_email: order.email || '',
+      membership_tier: membershipTier,
+      discount_percent: discountPercent,
+      subtotal,
+      discount,
+      tax: 0,
+      total,
+      payment_method: order.payment_method || 'POS_CASH',
+      tendered_amount: total,
+      change_amount: 0,
+      qr_code: thermalQrCode,
+      items: ((order.products || (order as any).items || []) as any[]).map((it) => {
+        let combinationLabel = it.variant_combination || it.combination_label || '';
+        if (!combinationLabel && it.selected_variant_values) {
+          if (it.selected_variant_values instanceof Map) {
+            combinationLabel = Array.from(it.selected_variant_values.values()).join(' / ');
+          } else if (typeof it.selected_variant_values === 'object') {
+            combinationLabel = Object.values(it.selected_variant_values).join(' / ');
+          }
+        }
+        return {
+          product_id: it.product_id,
+          variant_id: it.variant_id || undefined,
+          product_name: it.title || it.product_name || '',
+          quantity: it.quantity || 1,
+          price: it.price || 0,
+          total: it.total_price || it.total || (it.price || 0) * (it.quantity || 1),
+          combination_label: combinationLabel,
+        };
+      }),
+    };
+
+    return receiptData;
   }
 
   // ── Membership Settings ──────────────────────────────────────────
@@ -497,7 +648,9 @@ class PosService {
     const customer = await PosCustomer.findOne({ phone }).lean();
     if (!customer) throw new ApiError(HttpStatusCode.NOT_FOUND, 'Customer not found');
 
-    const orders = await Order.find({ customer_phone: phone, source: 'pos' })
+    const orders = await Order.find({
+      $or: [{ phone }, { customer_phone: phone } as any],
+    })
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
