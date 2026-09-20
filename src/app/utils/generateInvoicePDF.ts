@@ -363,8 +363,10 @@ export const createInvoicePDFBuffer = async (order: TOrder): Promise<Buffer> => 
     doc.text('Web: www.mimisphere.com', 40, footerY + 47);
 
     // Col 2: QR Code
-    const qrData = `Order ID: ${order.order_id}\nCustomer: ${order.customer_name}\nTotal: ${order.total_price}`;
-    const qrCodeDataUrl = await QRCode.toDataURL(qrData);
+    const baseUrl = process.env.FRONTEND_URL || 'https://www.mimisphere.com';
+    const trackingUrl = `${baseUrl}/track-order?orderId=${encodeURIComponent(order.order_id)}&phone=${encodeURIComponent(order.phone || '')}`;
+    const qrData = `Order ID: ${order.order_id}\nCustomer: ${order.customer_name}\nTotal: ৳${order.total_price}\nTrack: ${trackingUrl}`;
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData, { margin: 1 });
     doc.image(qrCodeDataUrl, 235, footerY + 5, { width: 45 });
     doc
       .fontSize(7)
