@@ -23,5 +23,8 @@ router.put('/membership-settings',    admin, posController.updateMembershipSetti
 router.post('/expenses',              admin, posController.createPosExpense);
 router.get('/expenses',               admin, posController.getPosExpenses);
 router.delete('/expenses/:id',        admin, posController.deletePosExpense);
+router.post('/sync-offline-orders',   admin, posController.syncOfflineOrders);
+router.post('/sync-offline-expenses', admin, posController.syncOfflineExpenses);
 
 export const PosRoutes = router;
+

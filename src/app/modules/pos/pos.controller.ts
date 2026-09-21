@@ -177,7 +177,28 @@ class PosController {
       data: result,
     });
   });
+
+  syncOfflineOrders = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.syncOfflineOrders(req.body);
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: `${result.synced_count} offline orders processed successfully`,
+      data: result,
+    });
+  });
+
+  syncOfflineExpenses = catchAsync(async (req: Request, res: Response) => {
+    const result = await posService.syncOfflineExpenses(req.body);
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: `${result.synced_count} offline expenses processed successfully`,
+      data: result,
+    });
+  });
 }
+
 
 export const posController = new PosController();
 

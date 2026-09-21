@@ -774,6 +774,126 @@ class PosService {
     }
     return deleted;
   }
+
+  // 12. Batch Sync Offline Orders
+  async syncOfflineOrders(payload: { orders: any[] }) {
+    const orders = payload?.orders || [];
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return { synced_count: 0, orders: [] };
+    }
+
+    const results = [];
+    for (const rawOrder of orders) {
+      try {
+        const offlineId = rawOrder.offline_id || rawOrder.receipt_number || '';
+        
+        // Idempotency check: avoid double-saving if already synced
+        if (offlineId) {
+          const existing = await Order.findOne({
+            $or: [
+              { order_id: offlineId },
+              { notes: { $regex: offlineId, $options: 'i' } },
+            ],
+          }).lean();
+
+          if (existing) {
+            results.push({
+              offline_id: offlineId,
+              order_id: existing.order_id,
+              status: 'already_synced',
+            });
+            continue;
+          }
+        }
+
+        // Process order creation & stock deduction
+        const enrichedPayload: IPosOrderPayload = {
+          items: rawOrder.items || [],
+          subtotal: Number(rawOrder.subtotal || rawOrder.total || 0),
+          discount: Number(rawOrder.discount || 0),
+          total: Number(rawOrder.total || 0),
+          payment_method: rawOrder.payment_method || 'POS_CASH',
+          tendered_amount: Number(rawOrder.tendered_amount || rawOrder.total || 0),
+          change_amount: Number(rawOrder.change_amount || 0),
+          customer_name: rawOrder.customer_name || 'Walk-in Customer',
+          customer_phone: rawOrder.customer_phone || '',
+          customer_email: rawOrder.customer_email || '',
+          membership_tier: rawOrder.membership_tier,
+          note: `[Offline Sync: ${offlineId}] ${rawOrder.note || 'Offline POS Sale'}`,
+        };
+
+        const createdReceipt = await this.createPosOrder(enrichedPayload);
+        results.push({
+          offline_id: offlineId,
+          order_id: createdReceipt.order_id,
+          receipt_number: createdReceipt.receipt_number,
+          status: 'success',
+        });
+      } catch (err: any) {
+        results.push({
+          offline_id: rawOrder.offline_id || 'unknown',
+          status: 'error',
+          message: err?.message || 'Failed to sync offline order',
+        });
+      }
+    }
+
+    return {
+      synced_count: results.filter((r) => r.status === 'success').length,
+      orders: results,
+    };
+  }
+
+  // 13. Batch Sync Offline Expenses
+  async syncOfflineExpenses(payload: { expenses: any[] }) {
+    const expenses = payload?.expenses || [];
+    if (!Array.isArray(expenses) || expenses.length === 0) {
+      return { synced_count: 0, expenses: [] };
+    }
+
+    const results = [];
+    for (const rawExp of expenses) {
+      try {
+        const offlineId = rawExp.offline_id || '';
+        if (offlineId) {
+          const existing = await PosExpense.findOne({
+            notes: { $regex: offlineId, $options: 'i' },
+          }).lean();
+          if (existing) {
+            results.push({ offline_id: offlineId, status: 'already_synced' });
+            continue;
+          }
+        }
+
+        const exp = await PosExpense.create({
+          title: (rawExp.title || 'General Expense').trim(),
+          amount: Number(rawExp.amount || 0),
+          category: rawExp.category || 'General',
+          notes: `[Offline: ${offlineId}] ${rawExp.notes || ''}`.trim(),
+          date: rawExp.date ? new Date(rawExp.date) : new Date(),
+          created_by: rawExp.created_by || 'Admin (Offline Sync)',
+        });
+
+        results.push({
+          offline_id: offlineId,
+          expense_id: exp._id,
+          status: 'success',
+        });
+      } catch (err: any) {
+        results.push({
+          offline_id: rawExp.offline_id || 'unknown',
+          status: 'error',
+          message: err?.message || 'Failed to sync expense',
+        });
+      }
+    }
+
+    return {
+      synced_count: results.filter((r) => r.status === 'success').length,
+      expenses: results,
+    };
+  }
 }
+
 
 export const posService = new PosService();

@@ -29,17 +29,23 @@ import { CampaignRoutes } from '../modules/campaign/campaign.routes';
 import { CollectionRoutes } from '../modules/collection/collection.route';
 import { PosRoutes } from '../modules/pos/pos.routes';
 import { CustomerReviewRoutes } from '../modules/customer-review/customerReview.routes';
+import { ReportsRoutes } from '../modules/reports/reports.routes';
 
 
 const router = Router();
 
 const moduleRoutes = [
   {
+    path: '/reports',
+    route: ReportsRoutes,
+  },
+  {
     path: '/admin/pos',
     route: PosRoutes,
   },
   {
     path: '/campaigns',
+
     route: CampaignRoutes,
   },
   {
