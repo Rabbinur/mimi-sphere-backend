@@ -325,6 +325,251 @@ class ReportsService {
       top_products: topProducts,
     };
   }
+
+  /**
+   * Product-level Sales Report with pagination, search, category & brand filtering
+   */
+  async getProductSalesReport(query: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    category?: string;
+    brand?: string;
+    startDate?: string;
+    endDate?: string;
+    channel?: string;
+  }) {
+    const page = Math.max(1, Number(query.page || 1));
+    const perPage = Math.max(1, Number(query.per_page || 10));
+    const channel = (query.channel || 'all').toLowerCase();
+    const search = query.search ? query.search.trim() : '';
+
+    // 1. Build Orders Date & Channel Filter
+    const orderFilter: any = {
+      order_status: { $nin: ['cancelled', 'returned'] },
+    };
+
+    if (query.startDate || query.endDate) {
+      const { start, end } = this.parseBstDateRange(query.startDate, query.endDate);
+      orderFilter.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (channel === 'pos') {
+      orderFilter.order_type = 'POS';
+    } else if (channel === 'online') {
+      orderFilter.order_type = 'ONLINE';
+    }
+
+    // 2. Query Orders to Aggregate Sales Per Product
+    const orders = await Order.find(orderFilter, { products: 1, items: 1, total_price: 1 }).lean();
+
+    const salesMap = new Map<string, { sold_qty: number; sold_amount: number }>();
+    orders.forEach((o: any) => {
+      const items = o.products || o.items || [];
+      if (Array.isArray(items)) {
+        items.forEach((it: any) => {
+          const pId = String(it.product_id || '');
+          if (!pId) return;
+
+          const qty = Number(it.quantity || 1);
+          const amount = Number(it.total_price || it.total || (it.price || 0) * qty);
+
+          const existing = salesMap.get(pId) || { sold_qty: 0, sold_amount: 0 };
+          existing.sold_qty += qty;
+          existing.sold_amount += amount;
+          salesMap.set(pId, existing);
+        });
+      }
+    });
+
+    // 3. Build Product Query
+    const productQuery: any = {};
+    if (search) {
+      productQuery.$or = [
+        { product_title: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (query.category && mongoose.isValidObjectId(query.category)) {
+      productQuery.product_categories = query.category;
+    }
+
+    if (query.brand && mongoose.isValidObjectId(query.brand)) {
+      productQuery.brand = query.brand;
+    }
+
+    // Fetch products
+    const productsDb = await Product.find(productQuery)
+      .populate('product_categories', 'name')
+      .populate('brand', 'name')
+      .lean();
+
+    // Map and calculate
+    let allItems = productsDb.map((p: any) => {
+      const pId = String(p._id);
+      const sales = salesMap.get(pId) || { sold_qty: 0, sold_amount: 0 };
+
+      // Category Name
+      let categoryName = 'General';
+      if (Array.isArray(p.product_categories) && p.product_categories.length > 0) {
+        categoryName = p.product_categories.map((c: any) => c.name || c).join(', ');
+      }
+
+      // Brand Name
+      let brandName = 'MIMI SPHERE';
+      if (p.brand && typeof p.brand === 'object' && p.brand.name) {
+        brandName = p.brand.name;
+      } else if (typeof p.brand === 'string' && p.brand.trim()) {
+        brandName = p.brand;
+      }
+
+      return {
+        product_id: pId,
+        sku: p.sku || `SKU-${pId.slice(-5).toUpperCase()}`,
+        product_name: p.product_title || 'Unnamed Product',
+        thumbnail: p.thumbnail || (Array.isArray(p.product_images) && p.product_images[0]) || '',
+        brand: brandName,
+        category: categoryName,
+        sold_qty: sales.sold_qty,
+        sold_amount: Math.round(sales.sold_amount * 100) / 100,
+        instock_qty: Number(p.quantity || 0),
+        unit_price: Number(p.product_price || 0),
+      };
+    });
+
+    // Sort by sold quantity descending first, then by in-stock quantity
+    allItems.sort((a, b) => b.sold_qty - a.sold_qty || b.sold_amount - a.sold_amount);
+
+    // Compute Overall Summary
+    const totalSoldQty = allItems.reduce((acc, item) => acc + item.sold_qty, 0);
+    const totalSoldAmount = allItems.reduce((acc, item) => acc + item.sold_amount, 0);
+    const totalItemsCount = allItems.length;
+    const totalPages = Math.ceil(totalItemsCount / perPage) || 1;
+
+    // Slice for pagination
+    const startIndex = (page - 1) * perPage;
+    const paginatedItems = allItems.slice(startIndex, startIndex + perPage);
+
+    return {
+      data: paginatedItems,
+      pagination: {
+        currentPage: page,
+        perPage,
+        totalItems: totalItemsCount,
+        totalPages,
+      },
+      summary: {
+        total_sold_qty: totalSoldQty,
+        total_sold_amount: Math.round(totalSoldAmount * 100) / 100,
+        total_products_count: totalItemsCount,
+      },
+    };
+  }
+
+  /**
+   * Purchase & Stock Inventory Report with pagination and valuation
+   */
+  async getPurchaseReport(query: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    category?: string;
+    brand?: string;
+  }) {
+    const page = Math.max(1, Number(query.page || 1));
+    const perPage = Math.max(1, Number(query.per_page || 10));
+    const search = query.search ? query.search.trim() : '';
+
+    const productQuery: any = {};
+    if (search) {
+      productQuery.$or = [
+        { product_title: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (query.category && mongoose.isValidObjectId(query.category)) {
+      productQuery.product_categories = query.category;
+    }
+
+    if (query.brand && mongoose.isValidObjectId(query.brand)) {
+      productQuery.brand = query.brand;
+    }
+
+    const totalItemsCount = await Product.countDocuments(productQuery);
+    const totalPages = Math.ceil(totalItemsCount / perPage) || 1;
+
+    const products = await Product.find(productQuery)
+      .populate('product_categories', 'name')
+      .populate('brand', 'name')
+      .sort({ quantity: -1, createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .lean();
+
+    let totalStockQty = 0;
+    let totalStockValuation = 0;
+
+    const data = products.map((p: any) => {
+      const pId = String(p._id);
+      const qty = Number(p.quantity || 0);
+      const cost = Number(p.cost_price > 0 ? p.cost_price : (p.product_price || 0) * 0.7);
+      const valuation = Math.round(qty * cost * 100) / 100;
+
+      totalStockQty += qty;
+      totalStockValuation += valuation;
+
+      // Category Name
+      let categoryName = 'General';
+      if (Array.isArray(p.product_categories) && p.product_categories.length > 0) {
+        categoryName = p.product_categories.map((c: any) => c.name || c).join(', ');
+      }
+
+      // Brand Name
+      let brandName = 'MIMI SPHERE';
+      if (p.brand && typeof p.brand === 'object' && p.brand.name) {
+        brandName = p.brand.name;
+      } else if (typeof p.brand === 'string' && p.brand.trim()) {
+        brandName = p.brand;
+      }
+
+      const status: 'In Stock' | 'Low Stock' | 'Out of Stock' =
+        qty > 10 ? 'In Stock' : qty > 0 ? 'Low Stock' : 'Out of Stock';
+
+      return {
+        product_id: pId,
+        sku: p.sku || `SKU-${pId.slice(-5).toUpperCase()}`,
+        product_name: p.product_title || 'Unnamed Product',
+        thumbnail: p.thumbnail || (Array.isArray(p.product_images) && p.product_images[0]) || '',
+        brand: brandName,
+        category: categoryName,
+        unit_cost: Math.round(cost * 100) / 100,
+        unit_price: Number(p.product_price || 0),
+        instock_qty: qty,
+        total_stock_value: valuation,
+        stock_status: status,
+      };
+    });
+
+    return {
+      data,
+      pagination: {
+        currentPage: page,
+        perPage,
+        totalItems: totalItemsCount,
+        totalPages,
+      },
+      summary: {
+        total_stock_qty: totalStockQty,
+        total_stock_valuation: Math.round(totalStockValuation * 100) / 100,
+        total_items_count: totalItemsCount,
+      },
+    };
+  }
 }
+
 
 export const reportsService = new ReportsService();
