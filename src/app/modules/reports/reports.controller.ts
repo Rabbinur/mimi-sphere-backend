@@ -43,13 +43,15 @@ class ReportsController {
   });
 
   getPurchaseReport = catchAsync(async (req: Request, res: Response) => {
-    const { page, per_page, search, category, brand } = req.query;
+    const { page, per_page, search, category, brand, startDate, endDate } = req.query;
     const result = await reportsService.getPurchaseReport({
       page: page ? Number(page) : 1,
       per_page: per_page ? Number(per_page) : 10,
       search: search ? String(search) : undefined,
       category: category ? String(category) : undefined,
       brand: brand ? String(brand) : undefined,
+      startDate: startDate ? String(startDate) : undefined,
+      endDate: endDate ? String(endDate) : undefined,
     });
 
     sendResponse(res, {

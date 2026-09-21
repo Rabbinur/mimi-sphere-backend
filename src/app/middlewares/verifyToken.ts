@@ -10,7 +10,7 @@ const verifyToken =
   (allowedRoles?: IRoles[]) =>
   (req: Request, res: Response, next: NextFunction) => {
     // 1. Get token from cookies or authorization header
-    let token = req.cookies?.accessToken;
+    let token = req.cookies?.accessToken || req.cookies?.adminAccessToken;
 
     if (!token && req.headers.authorization) {
       const raw_token = req.headers.authorization;

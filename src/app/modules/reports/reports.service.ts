@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
-import { OrderModel as Order } from '../orders/order.model';
+import { OrderModel as Order, SuccessOrderModel } from '../orders/order.model';
 import { Product } from '../products/product.model';
+import { CategoryModel } from '../category/category.model';
+import { BrandModel } from '../brand/brand.model';
 import { PosExpense } from '../pos/posExpense.model';
 import { posCalculationService } from '../pos/posCalculation.service';
 import { IFinancialStatement, IReportQuery } from './reports.interface';
@@ -58,9 +60,14 @@ class ReportsService {
     }
 
     // 2. Fetch Orders, Returns, Expenses in Parallel
-    const [orders, returnOrders, expenses, closingStock] = await Promise.all([
+    const [activeOrders, successOrders, returnActiveOrders, returnSuccessOrders, expenses, closingStock] = await Promise.all([
       Order.find(orderFilter).lean(),
+      SuccessOrderModel.find(orderFilter).lean(),
       Order.find({
+        ...orderFilter,
+        $or: [{ order_status: 'returned' }, { payment_status: 'refunded' }],
+      }).lean(),
+      SuccessOrderModel.find({
         ...orderFilter,
         $or: [{ order_status: 'returned' }, { payment_status: 'refunded' }],
       }).lean(),
@@ -69,6 +76,9 @@ class ReportsService {
       }).lean(),
       posCalculationService.calculateClosingStock(),
     ]);
+
+    const orders = [...activeOrders, ...successOrders];
+    const returnOrders = [...returnActiveOrders, ...returnSuccessOrders];
 
     // 3. Collect Unique Product IDs for Accurate Cost Calculation
     const productIds = new Set<string>();
@@ -364,8 +374,12 @@ class ReportsService {
       ];
     }
 
-    // 2. Query Orders to Aggregate Sales Per Product
-    const orders = await Order.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean();
+    // 2. Query Orders to Aggregate Sales Per Product (both active & delivered in SuccessOrderModel)
+    const [activeOrders, successOrders] = await Promise.all([
+      Order.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean(),
+      SuccessOrderModel.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean(),
+    ]);
+    const orders = [...activeOrders, ...successOrders];
 
     const salesMap = new Map<
       string,
@@ -433,11 +447,15 @@ class ReportsService {
       productQuery.brand = query.brand;
     }
 
-    // Fetch products
-    const productsDb = await Product.find(productQuery)
-      .populate('product_categories', 'name')
-      .populate('brand', 'name')
-      .lean();
+    // Fetch products, categories and brands in parallel without fragile populate cast errors
+    const [productsDb, allCategories, allBrands] = await Promise.all([
+      Product.find(productQuery).lean(),
+      CategoryModel.find({}, { name: 1 }).lean(),
+      BrandModel.find({}, { name: 1 }).lean(),
+    ]);
+
+    const categoryMap = new Map(allCategories.map((c: any) => [String(c._id), c.name]));
+    const brandMap = new Map(allBrands.map((b: any) => [String(b._id), b.name]));
 
     // Map and calculate
     let allItems = productsDb.map((p: any) => {
@@ -454,15 +472,23 @@ class ReportsService {
       // Category Name
       let categoryName = 'General';
       if (Array.isArray(p.product_categories) && p.product_categories.length > 0) {
-        categoryName = p.product_categories.map((c: any) => c.name || c).join(', ');
+        const catNames = p.product_categories
+          .map((c: any) => {
+            if (c && typeof c === 'object' && c.name) return c.name;
+            return categoryMap.get(String(c)) || String(c);
+          })
+          .filter(Boolean);
+        if (catNames.length > 0) categoryName = catNames.join(', ');
       }
 
       // Brand Name
       let brandName = 'MIMI SPHERE';
-      if (p.brand && typeof p.brand === 'object' && p.brand.name) {
-        brandName = p.brand.name;
-      } else if (typeof p.brand === 'string' && p.brand.trim()) {
-        brandName = p.brand;
+      if (p.brand) {
+        if (typeof p.brand === 'object' && p.brand.name) {
+          brandName = p.brand.name;
+        } else if (typeof p.brand === 'string' && p.brand.trim()) {
+          brandName = brandMap.get(p.brand) || p.brand;
+        }
       }
 
       return {
@@ -529,6 +555,8 @@ class ReportsService {
     search?: string;
     category?: string;
     brand?: string;
+    startDate?: string;
+    endDate?: string;
   }) {
     const page = Math.max(1, Number(query.page || 1));
     const perPage = Math.max(1, Number(query.per_page || 10));
@@ -551,19 +579,50 @@ class ReportsService {
       productQuery.brand = query.brand;
     }
 
+    if (query.startDate || query.endDate) {
+      const { start, end } = this.parseBstDateRange(query.startDate, query.endDate);
+      productQuery.createdAt = { $gte: start, $lte: end };
+    }
+
     const totalItemsCount = await Product.countDocuments(productQuery);
     const totalPages = Math.ceil(totalItemsCount / perPage) || 1;
 
-    const products = await Product.find(productQuery)
-      .populate('product_categories', 'name')
-      .populate('brand', 'name')
-      .sort({ quantity: -1, createdAt: -1 })
-      .skip((page - 1) * perPage)
-      .limit(perPage)
-      .lean();
+    const [products, allCategories, allBrands] = await Promise.all([
+      Product.find(productQuery)
+        .sort({ quantity: -1, createdAt: -1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .lean(),
+      CategoryModel.find({}, { name: 1 }).lean(),
+      BrandModel.find({}, { name: 1 }).lean(),
+    ]);
 
-    let totalStockQty = 0;
-    let totalStockValuation = 0;
+    const categoryMap = new Map(allCategories.map((c: any) => [String(c._id), c.name]));
+    const brandMap = new Map(allBrands.map((b: any) => [String(b._id), b.name]));
+
+    // Compute global summary across all items matching productQuery
+    const [summaryAgg] = await Product.aggregate([
+      { $match: productQuery },
+      {
+        $project: {
+          qty: { $ifNull: ["$quantity", 0] },
+          cost: {
+            $cond: [
+              { $gt: ["$cost_price", 0] },
+              "$cost_price",
+              { $multiply: [{ $ifNull: ["$product_price", 0] }, 0.7] },
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total_stock_qty: { $sum: "$qty" },
+          total_stock_valuation: { $sum: { $multiply: ["$qty", "$cost"] } },
+        },
+      },
+    ]);
 
     const data = products.map((p: any) => {
       const pId = String(p._id);
@@ -571,21 +630,26 @@ class ReportsService {
       const cost = Number(p.cost_price > 0 ? p.cost_price : (p.product_price || 0) * 0.7);
       const valuation = Math.round(qty * cost * 100) / 100;
 
-      totalStockQty += qty;
-      totalStockValuation += valuation;
-
       // Category Name
       let categoryName = 'General';
       if (Array.isArray(p.product_categories) && p.product_categories.length > 0) {
-        categoryName = p.product_categories.map((c: any) => c.name || c).join(', ');
+        const catNames = p.product_categories
+          .map((c: any) => {
+            if (c && typeof c === 'object' && c.name) return c.name;
+            return categoryMap.get(String(c)) || String(c);
+          })
+          .filter(Boolean);
+        if (catNames.length > 0) categoryName = catNames.join(', ');
       }
 
       // Brand Name
       let brandName = 'MIMI SPHERE';
-      if (p.brand && typeof p.brand === 'object' && p.brand.name) {
-        brandName = p.brand.name;
-      } else if (typeof p.brand === 'string' && p.brand.trim()) {
-        brandName = p.brand;
+      if (p.brand) {
+        if (typeof p.brand === 'object' && p.brand.name) {
+          brandName = p.brand.name;
+        } else if (typeof p.brand === 'string' && p.brand.trim()) {
+          brandName = brandMap.get(p.brand) || p.brand;
+        }
       }
 
       const status: 'In Stock' | 'Low Stock' | 'Out of Stock' =
@@ -615,8 +679,8 @@ class ReportsService {
         totalPages,
       },
       summary: {
-        total_stock_qty: totalStockQty,
-        total_stock_valuation: Math.round(totalStockValuation * 100) / 100,
+        total_stock_qty: summaryAgg?.total_stock_qty || 0,
+        total_stock_valuation: Math.round((summaryAgg?.total_stock_valuation || 0) * 100) / 100,
         total_items_count: totalItemsCount,
       },
     };
