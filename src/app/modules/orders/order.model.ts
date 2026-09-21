@@ -135,4 +135,3 @@ export const OrderSchema = new Schema<TOrder>(
 );
 
 export const OrderModel = model<TOrder>('Order', OrderSchema);
-export const SuccessOrderModel = model<TOrder>('SuccessOrder', OrderSchema);

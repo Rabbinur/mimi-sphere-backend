@@ -1,4 +1,4 @@
-import { OrderModel, SuccessOrderModel } from './order.model';
+import { OrderModel } from './order.model';
 import axios from 'axios';
 import mongoose from 'mongoose';
 import { TOrder } from './order.interface';
@@ -12,29 +12,9 @@ import { CourierUtils } from './courier.utils';
 import { CarrybeeUtils } from './carrybee.utils';
 import logger from '../../utils/logger';
 
-/* ================= HELPER FUNCTIONS FOR MULTIPLE COLLECTIONS ================= */
-const moveOrder = async (order: any, targetModel: any) => {
-  const orderObject = order.toObject ? order.toObject() : order;
-  // Create in target model
-  const newDoc = new targetModel(orderObject);
-  await targetModel.deleteOne({ _id: order._id });
-  await newDoc.save();
-  // Delete from source model
-  await order.constructor.deleteOne({ _id: order._id });
-  return newDoc;
-};
-
+/* ================= HELPER FUNCTIONS ================= */
 const saveAndSyncOrder = async (order: any) => {
-  const isDelivered = order.order_status === 'delivered';
-  const isCurrentlySuccessCollection = order.constructor.modelName === 'SuccessOrder';
-
   await order.save();
-
-  if (isDelivered && !isCurrentlySuccessCollection) {
-    return await moveOrder(order, SuccessOrderModel);
-  } else if (!isDelivered && isCurrentlySuccessCollection) {
-    return await moveOrder(order, OrderModel);
-  }
   return order;
 };
 
@@ -119,9 +99,7 @@ const createOrderIntoDB = async (payload: TOrder) => {
       }
     }
 
-    const isDelivered = payload.order_status === 'delivered';
-    const modelToUse = isDelivered ? SuccessOrderModel : OrderModel;
-    const order = await modelToUse.create([payload], { session });
+    const order = await OrderModel.create([payload], { session });
 
     await session.commitTransaction();
     session.endSession();
@@ -184,23 +162,11 @@ const sendOrderConfirmationEmail = async (order: TOrder) => {
 const getMyOrdersFromDB = async (email: string, status?: string) => {
   const query: any = { email };
 
-  if (status === 'success' || status === 'delivered') {
-    return await SuccessOrderModel.find(query).sort({ createdAt: -1 });
-  }
-
-  if (status === 'others') {
-    return await OrderModel.find(query).sort({ createdAt: -1 });
-  }
-
-  if (status) {
+  if (status && status !== 'others') {
     query.order_status = status;
-    return await OrderModel.find(query).sort({ createdAt: -1 });
   }
 
-  const activeOrders = await OrderModel.find(query).sort({ createdAt: -1 });
-  const successOrders = await SuccessOrderModel.find(query).sort({ createdAt: -1 });
-  const allOrders = [...activeOrders, ...successOrders];
-  allOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const allOrders = await OrderModel.find(query).sort({ createdAt: -1 });
   return allOrders;
 };
 
@@ -217,23 +183,11 @@ const getAllOrdersFromDB = async (search?: string, status?: string) => {
     ];
   }
 
-  if (status === 'success' || status === 'delivered') {
-    return await SuccessOrderModel.find(query).sort({ createdAt: -1 });
-  }
-
-  if (status === 'others') {
-    return await OrderModel.find(query).sort({ createdAt: -1 });
-  }
-
-  if (status) {
+  if (status && status !== 'others') {
     query.order_status = status;
-    return await OrderModel.find(query).sort({ createdAt: -1 });
   }
 
-  const activeOrders = await OrderModel.find(query).sort({ createdAt: -1 });
-  const successOrders = await SuccessOrderModel.find(query).sort({ createdAt: -1 });
-  const allOrders = [...activeOrders, ...successOrders];
-  allOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const allOrders = await OrderModel.find(query).sort({ createdAt: -1 });
   return allOrders;
 };
 
@@ -265,9 +219,7 @@ const getChannelOrdersManagement = async (queryParam: {
   }
 
   // Fetch all matching orders to calculate realtime summary stats
-  const activeOrders = await OrderModel.find(baseFilter).lean();
-  const successOrders = await SuccessOrderModel.find(baseFilter).lean();
-  const combinedAll = [...activeOrders, ...successOrders];
+  const combinedAll = await OrderModel.find(baseFilter).lean();
 
   // Calculate realtime overview stats
   let pendingCount = 0;
@@ -387,17 +339,11 @@ const getSingleOrderFromDB = async (id: string) => {
 
   if (mongoose.Types.ObjectId.isValid(id)) {
     order = await OrderModel.findById(id);
-    if (!order) {
-      order = await SuccessOrderModel.findById(id);
-    }
   }
 
   // Fallback: If not found by ObjectId or if id is an order_id string (e.g. ORD-2609002)
   if (!order) {
     order = await OrderModel.findOne({ order_id: id });
-    if (!order) {
-      order = await SuccessOrderModel.findOne({ order_id: id });
-    }
   }
 
   if (!order) throw new AppError('Order not found', 404);
@@ -412,9 +358,6 @@ const getSingleOrderByOrderIdFromDB = async (order_id: string) => {
   }
 
   let order = await OrderModel.findOne({ order_id });
-  if (!order) {
-    order = await SuccessOrderModel.findOne({ order_id });
-  }
 
   if (!order) {
     throw new AppError('Order not found', 404);
@@ -426,9 +369,6 @@ const getSingleOrderByOrderIdFromDB = async (order_id: string) => {
 /* ================= CANCEL ORDER ================= */
 const cancelOrderFromDB = async (id: string) => {
   let order = await OrderModel.findById(id);
-  if (!order) {
-    order = await SuccessOrderModel.findById(id);
-  }
   if (!order) throw new AppError('Order not found', 404);
 
   if (order.order_status === 'delivered') {
@@ -448,10 +388,6 @@ const updateOrderStatusIntoDB = async (
   payment_status: TOrder['payment_status'],
 ) => {
   let order = await OrderModel.findById(id);
-  if (!order) {
-    order = await SuccessOrderModel.findById(id);
-  }
-
   if (!order) throw new AppError('Order not found', 404);
 
   order.order_status = order_status;
@@ -480,13 +416,6 @@ const trackOrderFromDB = async (order_id: string, phone: string) => {
   });
 
   if (!order) {
-    order = await SuccessOrderModel.findOne({
-      order_id,
-      phone,
-    });
-  }
-
-  if (!order) {
     throw new AppError(
       'Order not found with this Order ID and phone number',
       404,
@@ -499,9 +428,6 @@ const trackOrderFromDB = async (order_id: string, phone: string) => {
 /* ================= STEADFAST COURIER ================= */
 const createSteadfastOrderIntoCourier = async (orderId: string) => {
   let order = await OrderModel.findById(orderId);
-  if (!order) {
-    order = await SuccessOrderModel.findById(orderId);
-  }
   if (!order) throw new AppError('Order not found', 404);
 
   const steadfastOrder = {
@@ -552,9 +478,6 @@ const checkFraudFromAPI = async (phone: string) => {
 /* ================= CARRYBEE COURIER ================= */
 const createCarrybeeOrderIntoCourier = async (orderId: string) => {
   let order = await OrderModel.findById(orderId);
-  if (!order) {
-    order = await SuccessOrderModel.findById(orderId);
-  }
   if (!order) throw new AppError('Order not found', 404);
 
   // 1. Get Store ID (Use the first active store)
@@ -638,14 +561,8 @@ const handleCarrybeeWebhookEvent = async (payload: any) => {
 
   if (consignment_id) {
     order = await OrderModel.findOne({ 'courier_details.consignment_id': consignment_id });
-    if (!order) {
-      order = await SuccessOrderModel.findOne({ 'courier_details.consignment_id': consignment_id });
-    }
   } else if (merchant_order_id) {
     order = await OrderModel.findOne({ order_id: merchant_order_id });
-    if (!order) {
-      order = await SuccessOrderModel.findOne({ order_id: merchant_order_id });
-    }
   }
 
   if (!order) {
@@ -885,46 +802,10 @@ const deleteOrderFromDB = async (id: string) => {
     throw new AppError('Invalid order id', 400);
   }
   let order = await OrderModel.findByIdAndDelete(id);
-  if (!order) {
-    order = await SuccessOrderModel.findByIdAndDelete(id);
-  }
   if (!order) throw new AppError('Order not found', 404);
   return order;
 };
 
-/* ================= ONE-TIME DATA MIGRATION ================= */
-const migrateExistingDeliveredOrders = async () => {
-  try {
-    logger.info('🔍 Checking for old delivered orders that need to be migrated to SuccessOrder collection...');
-    
-    // Find all orders in OrderModel that have status 'delivered'
-    const deliveredOrders = await OrderModel.find({ order_status: 'delivered' });
-    
-    if (deliveredOrders.length === 0) {
-      logger.info('✅ No pending delivered orders migration needed.');
-      return;
-    }
-
-    logger.info(`🔄 Migrating ${deliveredOrders.length} delivered orders to SuccessOrder collection...`);
-
-    let migratedCount = 0;
-    for (const order of deliveredOrders) {
-      const orderObject = order.toObject ? order.toObject() : order;
-      // Write to SuccessOrderModel
-      const newDoc = new SuccessOrderModel(orderObject);
-      // Ensure we don't cause duplicate keys in target
-      await SuccessOrderModel.deleteOne({ _id: order._id });
-      await newDoc.save();
-      // Remove from OrderModel
-      await OrderModel.deleteOne({ _id: order._id });
-      migratedCount++;
-    }
-
-    logger.info(`🎉 Successfully migrated ${migratedCount} delivered orders to SuccessOrder collection.`);
-  } catch (error: any) {
-    logger.error(`❌ Error migrating delivered orders: ${error.message}`);
-  }
-};
 
 export const OrderServices = {
   createOrderIntoDB,
@@ -943,6 +824,4 @@ export const OrderServices = {
   handleCarrybeeWebhookEvent,
   syncCourierOrderStatus,
   deleteOrderFromDB,
-  migrateExistingDeliveredOrders,
 };
-

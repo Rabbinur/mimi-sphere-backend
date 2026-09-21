@@ -53,6 +53,8 @@ export interface IPosOrderPayload {
   change_amount?: number;
   note?: string;
   membership_tier?: string;
+  order_status?: string;
+  payment_status?: string;
 }
 
 export interface IPosReceiptData {

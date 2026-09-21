@@ -9,9 +9,7 @@ async function main() {
     await mongoose.connect(config.database_url as string);
     logger.info('📦 Database connected successfully.');
 
-    // Run one-time migration for delivered orders
-    const { OrderServices } = await import('./app/modules/orders/order.services');
-    await OrderServices.migrateExistingDeliveredOrders();
+    // Run one-time migration for delivered orders (Removed)
 
     initCronJobs();
 

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { OrderModel as Order, SuccessOrderModel } from '../orders/order.model';
+import { OrderModel as Order } from '../orders/order.model';
 import { Product } from '../products/product.model';
 import { CategoryModel } from '../category/category.model';
 import { BrandModel } from '../brand/brand.model';
@@ -60,14 +60,9 @@ class ReportsService {
     }
 
     // 2. Fetch Orders, Returns, Expenses in Parallel
-    const [activeOrders, successOrders, returnActiveOrders, returnSuccessOrders, expenses, closingStock] = await Promise.all([
+    const [orders, returnOrders, expenses, closingStock] = await Promise.all([
       Order.find(orderFilter).lean(),
-      SuccessOrderModel.find(orderFilter).lean(),
       Order.find({
-        ...orderFilter,
-        $or: [{ order_status: 'returned' }, { payment_status: 'refunded' }],
-      }).lean(),
-      SuccessOrderModel.find({
         ...orderFilter,
         $or: [{ order_status: 'returned' }, { payment_status: 'refunded' }],
       }).lean(),
@@ -76,9 +71,6 @@ class ReportsService {
       }).lean(),
       posCalculationService.calculateClosingStock(),
     ]);
-
-    const orders = [...activeOrders, ...successOrders];
-    const returnOrders = [...returnActiveOrders, ...returnSuccessOrders];
 
     // 3. Collect Unique Product IDs for Accurate Cost Calculation
     const productIds = new Set<string>();
@@ -374,12 +366,8 @@ class ReportsService {
       ];
     }
 
-    // 2. Query Orders to Aggregate Sales Per Product (both active & delivered in SuccessOrderModel)
-    const [activeOrders, successOrders] = await Promise.all([
-      Order.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean(),
-      SuccessOrderModel.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean(),
-    ]);
-    const orders = [...activeOrders, ...successOrders];
+    // 2. Query Orders to Aggregate Sales Per Product
+    const orders = await Order.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean();
 
     const salesMap = new Map<
       string,

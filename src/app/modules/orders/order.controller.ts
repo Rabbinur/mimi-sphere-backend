@@ -412,11 +412,8 @@ const orderStatusUpdate = async (req: Request, res: Response) => {
       });
 
       // Update the order to mark purchase event as fired
-      const { OrderModel, SuccessOrderModel } = await import('./order.model');
-      const updated = await OrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
-      if (!updated) {
-        await SuccessOrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
-      }
+      const { OrderModel } = await import('./order.model');
+      await OrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
     }
 
     res.status(200).json({

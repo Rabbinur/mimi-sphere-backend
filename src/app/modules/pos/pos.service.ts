@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import QRCode from 'qrcode';
 import { Product } from '../products/product.model';
-import { OrderModel as Order, SuccessOrderModel as SuccessOrder } from '../orders/order.model';
+import { OrderModel as Order } from '../orders/order.model';
 import { IPosOrderPayload, IPosProductItem } from './pos.interface';
 import { PosCustomer, calculateMembership } from './posCustomer.model';
 import { MembershipSettings } from './membershipSettings.model';
@@ -236,8 +236,8 @@ class PosService {
       total_price: payload.total,
       discount_amount: payload.discount || 0,
       coupon: payload.coupon_code || undefined,
-      order_status: 'delivered', // In-store POS sale is delivered directly
-      payment_status: 'paid',
+      order_status: payload.order_status || 'delivered', 
+      payment_status: payload.payment_status || 'paid',
       payment_method: payload.payment_method || 'POS_CASH',
       delivery_charge: 0,
       notes: payload.note || 'In-Store POS Counter Purchase',
@@ -377,33 +377,12 @@ class PosService {
 
   // 5. Get Latest / Last POS Order Receipt (100% Database Driven)
   async getLastReceipt() {
-    // 1. Try finding latest POS order across both active and delivered success orders
-    const [lastPosOrder, lastPosSuccess] = await Promise.all([
-      Order.findOne({ order_type: 'POS' }).sort({ createdAt: -1 }).lean(),
-      SuccessOrder.findOne({ order_type: 'POS' }).sort({ createdAt: -1 }).lean(),
-    ]);
-
-    let order = lastPosOrder;
-    if (
-      !order ||
-      (lastPosSuccess && new Date(lastPosSuccess.createdAt || 0) > new Date(order.createdAt || 0))
-    ) {
-      order = lastPosSuccess;
-    }
+    // 1. Try finding latest POS order
+    let order = await Order.findOne({ order_type: 'POS' }).sort({ createdAt: -1 }).lean();
 
     // 2. Fallback to any latest order if no dedicated POS order is found
     if (!order) {
-      const [anyOrder, anySuccess] = await Promise.all([
-        Order.findOne({}).sort({ createdAt: -1 }).lean(),
-        SuccessOrder.findOne({}).sort({ createdAt: -1 }).lean(),
-      ]);
-      order = anyOrder;
-      if (
-        !order ||
-        (anySuccess && new Date(anySuccess.createdAt || 0) > new Date(order.createdAt || 0))
-      ) {
-        order = anySuccess;
-      }
+      order = await Order.findOne({}).sort({ createdAt: -1 }).lean();
     }
 
     if (!order) {
