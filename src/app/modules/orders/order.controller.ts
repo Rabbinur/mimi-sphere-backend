@@ -224,6 +224,30 @@ const handleGetAllOrders = async (req: Request, res: Response) => {
   }
 };
 
+const getChannelOrdersManagement = async (req: Request, res: Response) => {
+  try {
+    const { channel, search, status, startDate, endDate, page, limit } = req.query;
+
+    const result = await OrderServices.getChannelOrdersManagement({
+      channel: (channel as any) || 'ONLINE',
+      search: search as string | undefined,
+      status: status as string | undefined,
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Channel orders retrieved successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 /* ================= SINGLE ORDER ================= */
 const singleOrder = async (req: Request, res: Response) => {
   try {
@@ -563,6 +587,7 @@ export const OrderController = {
   createOrder,
   myOrders,
   handleGetAllOrders,
+  getChannelOrdersManagement,
   singleOrder,
   cancelOrder,
   orderStatusUpdate,

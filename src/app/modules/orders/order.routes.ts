@@ -26,6 +26,11 @@ router.get(
   OrderController.handleGetAllOrders,
 );
 router.get(
+  '/channel-orders',
+  verifyToken([UserRole.ADMIN]),
+  OrderController.getChannelOrdersManagement,
+);
+router.get(
   '/:id',
   verifyToken([UserRole.USER, UserRole.ADMIN]),
   OrderController.singleOrder,

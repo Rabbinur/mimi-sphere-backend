@@ -237,6 +237,150 @@ const getAllOrdersFromDB = async (search?: string, status?: string) => {
   return allOrders;
 };
 
+/* ================= CHANNEL ORDERS MANAGEMENT (ONLINE / POS) ================= */
+const getChannelOrdersManagement = async (queryParam: {
+  channel?: 'ONLINE' | 'POS' | 'ALL';
+  search?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}) => {
+  const channel = (queryParam.channel || 'ONLINE').toUpperCase();
+  const page = Math.max(1, Number(queryParam.page || 1));
+  const limit = Math.max(1, Number(queryParam.limit || 10));
+  const skip = (page - 1) * limit;
+
+  // Base query for channel
+  const baseFilter: any = {};
+  if (channel === 'ONLINE') {
+    baseFilter.$or = [
+      { order_type: { $in: ['ONLINE', 'online'] } },
+      { order_type: { $exists: false } },
+      { order_type: null },
+    ];
+  } else if (channel === 'POS') {
+    baseFilter.order_type = { $in: ['POS', 'pos'] };
+  }
+
+  // Fetch all matching orders to calculate realtime summary stats
+  const activeOrders = await OrderModel.find(baseFilter).lean();
+  const successOrders = await SuccessOrderModel.find(baseFilter).lean();
+  const combinedAll = [...activeOrders, ...successOrders];
+
+  // Calculate realtime overview stats
+  let pendingCount = 0;
+  let pendingAmount = 0;
+  let processingCount = 0;
+  let processingAmount = 0;
+  let deliveredCount = 0;
+  let deliveredAmount = 0;
+  let cancelledCount = 0;
+  let cancelledAmount = 0;
+  let totalRevenue = 0;
+
+  combinedAll.forEach((o: any) => {
+    const total = Number(o.total_price || 0);
+    totalRevenue += total;
+    const st = String(o.order_status || '').toLowerCase();
+    if (st === 'pending') {
+      pendingCount++;
+      pendingAmount += total;
+    } else if (st === 'processing' || st === 'shipped' || st === 'out_for_delivery') {
+      processingCount++;
+      processingAmount += total;
+    } else if (st === 'delivered' || st === 'paid' || st === 'success') {
+      deliveredCount++;
+      deliveredAmount += total;
+    } else if (st === 'canceled' || st === 'cancelled' || st === 'returned' || st === 'failed') {
+      cancelledCount++;
+      cancelledAmount += total;
+    }
+  });
+
+  // Filter for table
+  let filtered = [...combinedAll];
+
+  if (queryParam.status && queryParam.status !== 'all') {
+    const targetStatus = queryParam.status.toLowerCase();
+    if (targetStatus === 'processing') {
+      filtered = filtered.filter((o: any) =>
+        ['processing', 'shipped', 'out_for_delivery'].includes(
+          String(o.order_status).toLowerCase(),
+        ),
+      );
+    } else if (targetStatus === 'delivered') {
+      filtered = filtered.filter((o: any) =>
+        ['delivered', 'paid', 'success'].includes(
+          String(o.order_status).toLowerCase(),
+        ),
+      );
+    } else if (targetStatus === 'cancelled' || targetStatus === 'canceled') {
+      filtered = filtered.filter((o: any) =>
+        ['canceled', 'cancelled', 'returned', 'failed'].includes(
+          String(o.order_status).toLowerCase(),
+        ),
+      );
+    } else {
+      filtered = filtered.filter(
+        (o: any) => String(o.order_status).toLowerCase() === targetStatus,
+      );
+    }
+  }
+
+  if (queryParam.search) {
+    const s = queryParam.search.trim().toLowerCase();
+    filtered = filtered.filter(
+      (o: any) =>
+        (o.order_id && o.order_id.toLowerCase().includes(s)) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(s)) ||
+        (o.phone && o.phone.toLowerCase().includes(s)) ||
+        (o.email && o.email.toLowerCase().includes(s)),
+    );
+  }
+
+  if (queryParam.startDate || queryParam.endDate) {
+    const start = queryParam.startDate
+      ? new Date(queryParam.startDate)
+      : new Date(0);
+    const end = queryParam.endDate
+      ? new Date(new Date(queryParam.endDate).setHours(23, 59, 59, 999))
+      : new Date();
+    filtered = filtered.filter((o: any) => {
+      const d = new Date(o.createdAt);
+      return d >= start && d <= end;
+    });
+  }
+
+  // Sort by createdAt descending
+  filtered.sort(
+    (a: any, b: any) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  const totalFiltered = filtered.length;
+  const paginatedOrders = filtered.slice(skip, skip + limit);
+
+  return {
+    stats: {
+      total_orders: combinedAll.length,
+      total_revenue: Math.round(totalRevenue * 100) / 100,
+      pending: { count: pendingCount, amount: Math.round(pendingAmount * 100) / 100 },
+      processing: { count: processingCount, amount: Math.round(processingAmount * 100) / 100 },
+      delivered: { count: deliveredCount, amount: Math.round(deliveredAmount * 100) / 100 },
+      cancelled: { count: cancelledCount, amount: Math.round(cancelledAmount * 100) / 100 },
+    },
+    orders: paginatedOrders,
+    pagination: {
+      total: totalFiltered,
+      page,
+      limit,
+      totalPages: Math.ceil(totalFiltered / limit) || 1,
+    },
+  };
+};
+
 /* ================= SINGLE ORDER ================= */
 const getSingleOrderFromDB = async (id: string) => {
   let order: any = null;
@@ -786,6 +930,7 @@ export const OrderServices = {
   createOrderIntoDB,
   getMyOrdersFromDB,
   getAllOrdersFromDB,
+  getChannelOrdersManagement,
   getSingleOrderFromDB,
   cancelOrderFromDB,
   updateOrderStatusIntoDB,

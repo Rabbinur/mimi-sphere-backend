@@ -355,16 +355,32 @@ class ReportsService {
     }
 
     if (channel === 'pos') {
-      orderFilter.order_type = 'POS';
+      orderFilter.order_type = { $in: ['POS', 'pos'] };
     } else if (channel === 'online') {
-      orderFilter.order_type = 'ONLINE';
+      orderFilter.$or = [
+        { order_type: { $in: ['ONLINE', 'online'] } },
+        { order_type: { $exists: false } },
+        { order_type: null },
+      ];
     }
 
     // 2. Query Orders to Aggregate Sales Per Product
-    const orders = await Order.find(orderFilter, { products: 1, items: 1, total_price: 1 }).lean();
+    const orders = await Order.find(orderFilter, { products: 1, items: 1, total_price: 1, order_type: 1 }).lean();
 
-    const salesMap = new Map<string, { sold_qty: number; sold_amount: number }>();
+    const salesMap = new Map<
+      string,
+      {
+        sold_qty: number;
+        sold_amount: number;
+        online_qty: number;
+        online_amount: number;
+        pos_qty: number;
+        pos_amount: number;
+      }
+    >();
+
     orders.forEach((o: any) => {
+      const isPos = String(o.order_type || '').toUpperCase() === 'POS';
       const items = o.products || o.items || [];
       if (Array.isArray(items)) {
         items.forEach((it: any) => {
@@ -374,9 +390,26 @@ class ReportsService {
           const qty = Number(it.quantity || 1);
           const amount = Number(it.total_price || it.total || (it.price || 0) * qty);
 
-          const existing = salesMap.get(pId) || { sold_qty: 0, sold_amount: 0 };
+          const existing = salesMap.get(pId) || {
+            sold_qty: 0,
+            sold_amount: 0,
+            online_qty: 0,
+            online_amount: 0,
+            pos_qty: 0,
+            pos_amount: 0,
+          };
+
           existing.sold_qty += qty;
           existing.sold_amount += amount;
+
+          if (isPos) {
+            existing.pos_qty += qty;
+            existing.pos_amount += amount;
+          } else {
+            existing.online_qty += qty;
+            existing.online_amount += amount;
+          }
+
           salesMap.set(pId, existing);
         });
       }
@@ -409,7 +442,14 @@ class ReportsService {
     // Map and calculate
     let allItems = productsDb.map((p: any) => {
       const pId = String(p._id);
-      const sales = salesMap.get(pId) || { sold_qty: 0, sold_amount: 0 };
+      const sales = salesMap.get(pId) || {
+        sold_qty: 0,
+        sold_amount: 0,
+        online_qty: 0,
+        online_amount: 0,
+        pos_qty: 0,
+        pos_amount: 0,
+      };
 
       // Category Name
       let categoryName = 'General';
@@ -434,6 +474,10 @@ class ReportsService {
         category: categoryName,
         sold_qty: sales.sold_qty,
         sold_amount: Math.round(sales.sold_amount * 100) / 100,
+        online_qty: sales.online_qty,
+        online_amount: Math.round(sales.online_amount * 100) / 100,
+        pos_qty: sales.pos_qty,
+        pos_amount: Math.round(sales.pos_amount * 100) / 100,
         instock_qty: Number(p.quantity || 0),
         unit_price: Number(p.product_price || 0),
       };
@@ -445,6 +489,10 @@ class ReportsService {
     // Compute Overall Summary
     const totalSoldQty = allItems.reduce((acc, item) => acc + item.sold_qty, 0);
     const totalSoldAmount = allItems.reduce((acc, item) => acc + item.sold_amount, 0);
+    const totalOnlineQty = allItems.reduce((acc, item) => acc + item.online_qty, 0);
+    const totalOnlineAmount = allItems.reduce((acc, item) => acc + item.online_amount, 0);
+    const totalPosQty = allItems.reduce((acc, item) => acc + item.pos_qty, 0);
+    const totalPosAmount = allItems.reduce((acc, item) => acc + item.pos_amount, 0);
     const totalItemsCount = allItems.length;
     const totalPages = Math.ceil(totalItemsCount / perPage) || 1;
 
@@ -456,13 +504,17 @@ class ReportsService {
       data: paginatedItems,
       pagination: {
         currentPage: page,
-        perPage,
+        perPage: perPage,
         totalItems: totalItemsCount,
-        totalPages,
+        totalPages: totalPages,
       },
       summary: {
         total_sold_qty: totalSoldQty,
         total_sold_amount: Math.round(totalSoldAmount * 100) / 100,
+        total_online_qty: totalOnlineQty,
+        total_online_amount: Math.round(totalOnlineAmount * 100) / 100,
+        total_pos_qty: totalPosQty,
+        total_pos_amount: Math.round(totalPosAmount * 100) / 100,
         total_products_count: totalItemsCount,
       },
     };

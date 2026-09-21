@@ -110,7 +110,7 @@ export class DiscountServices {
 
     const total = await DiscountModel.countDocuments(filter);
     const discounts = await DiscountModel.find(filter)
-      .populate('products', 'product_name slug sku pricing inventory featured_image')
+      .populate('products', 'product_title thumbnail product_price sku barcode')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -129,7 +129,7 @@ export class DiscountServices {
   static async getById(id: string) {
     return await DiscountModel.findById(id).populate(
       'products',
-      'product_name slug sku pricing inventory featured_image'
+      'product_title thumbnail product_price sku barcode'
     );
   }
 
