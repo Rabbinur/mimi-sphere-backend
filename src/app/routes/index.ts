@@ -31,7 +31,8 @@ import { PosRoutes } from '../modules/pos/pos.routes';
 import { CustomerReviewRoutes } from '../modules/customer-review/customerReview.routes';
 import { ReportsRoutes } from '../modules/reports/reports.routes';
 import { DiscountRoutes } from '../modules/discount/discount.route';
-
+import { supplierRoutes } from '../modules/supplier/supplier.route';
+import { purchaseRoutes } from '../modules/purchase/purchase.route';
 
 const router = Router();
 
@@ -153,6 +154,14 @@ const moduleRoutes = [
   {
     path: '/checkout-leads',
     route: CheckoutLeadRoutes,
+  },
+  {
+    path: '/suppliers',
+    route: supplierRoutes,
+  },
+  {
+    path: '/purchases',
+    route: purchaseRoutes,
   },
 ];
 
