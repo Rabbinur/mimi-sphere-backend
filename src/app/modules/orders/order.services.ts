@@ -148,7 +148,7 @@ const sendOrderConfirmationEmail = async (order: TOrder) => {
   }
 
   // Send Notification to Admin
-  const adminEmail = 'slsuyel@gmail.com';
+  const adminEmail = 'rabbinurmuktar@gmail.com';
   sendEmail(
     adminEmail,
     `New Order Received - #${order.order_id}`,

@@ -57,9 +57,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://www.shoppingcart.bd',
-  'https://shoppingcart.bd',
-  'https://admin.shoppingcart.bd',
+  // 'https://www.shoppingcart.bd',
+  // 'https://shoppingcart.bd',
+  // 'https://admin.shoppingcart.bd',
 ];
 
 app.use(
