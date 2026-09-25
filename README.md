@@ -1,4 +1,4 @@
-# Shopping Cart BD - Server
+# Mimi Sphere - Server
 
-Backend for Shopping Cart BD (Bangladesh).
+Backend for Mimi Sphere (Bangladesh).
 URL: https://www.shoppingcart.bd/

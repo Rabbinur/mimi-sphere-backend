@@ -32,10 +32,22 @@ const updateFile = async (id: string, updateData: Partial<IFile>): Promise<IFile
   return updatedFile;
 };
 
+import { v2 as cloudinary } from 'cloudinary';
+
 const deleteFile = async (id: string): Promise<IFile | null> => {
   if (!Types.ObjectId.isValid(id)) throw new Error('Invalid file ID');
+  const file = await FileModel.findById(id);
+  if (!file) throw new Error('File not found');
+
+  if (file.key) {
+    try {
+      await cloudinary.uploader.destroy(file.key);
+    } catch (cErr) {
+      console.warn('Failed to delete from Cloudinary:', cErr);
+    }
+  }
+
   const deletedFile = await FileModel.findByIdAndDelete(id);
-  if (!deletedFile) throw new Error('File not found');
   return deletedFile;
 };
 
@@ -45,13 +57,25 @@ const deleteFiles = async (ids: string[]): Promise<IFile[]> => {
 
   if (validIds.length === 0) throw new Error('No valid file IDs provided');
 
-  const deletedFiles = await FileModel.find({ _id: { $in: validIds } });
+  const filesToDelete = await FileModel.find({ _id: { $in: validIds } });
 
-  if (deletedFiles.length === 0) throw new Error('No matching files found');
+  if (filesToDelete.length === 0) throw new Error('No matching files found');
+
+  await Promise.all(
+    filesToDelete.map(async (file) => {
+      if (file.key) {
+        try {
+          await cloudinary.uploader.destroy(file.key);
+        } catch (cErr) {
+          console.warn('Failed to delete from Cloudinary:', cErr);
+        }
+      }
+    })
+  );
 
   await FileModel.deleteMany({ _id: { $in: validIds } });
 
-  return deletedFiles;
+  return filesToDelete;
 };
 
 

@@ -31,10 +31,49 @@ export interface HeroFeature {
   link: string;
 }
 
+export interface BentoItem {
+  badge?: string;
+  badgeColor?: string;
+  title: string;
+  subtitle?: string;
+  image: string;
+  link: string;
+  categorySlug?: string;
+  colSpan?: number;
+  rowSpan?: number;
+}
+
+export interface BentoGridCMS {
+  isEnabled: boolean;
+  tag?: string;
+  title?: string;
+  items: BentoItem[];
+}
+
+export interface FeaturedCollectionsCMS {
+  isEnabled: boolean;
+  title?: string;
+  subtitle?: string;
+}
+
+export interface ExitIntentPopupCMS {
+  isEnabled: boolean;
+  title: string;
+  subtitle: string;
+  voucherCode: string;
+  discountText: string;
+  expiryMinutes: number;
+  ctaText: string;
+  declineText: string;
+}
+
 export interface CMS {
   company: Company;
   social: Social;
   heroSliderDesktop: HeroSlide[];
   heroSliderMobile: HeroSlide[];
   heroFeatures: HeroFeature[];
+  bentoGrid?: BentoGridCMS;
+  featuredCollections?: FeaturedCollectionsCMS;
+  exitIntentPopup?: ExitIntentPopupCMS;
 }

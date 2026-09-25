@@ -1,13 +1,13 @@
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Application, NextFunction, Request, Response } from 'express';
-import globalErrorHandler from './app/middlewares/globalErrorHandler';
-import cookieParser from 'cookie-parser';
-import router from './app/routes';
-import compression from 'compression';
-import morgan from 'morgan';
 import fs from 'fs';
+import morgan from 'morgan';
 import path from 'path';
+import globalErrorHandler from './app/middlewares/globalErrorHandler';
+import router from './app/routes';
 import logger from './app/utils/logger';
 
 dotenv.config();
@@ -57,19 +57,30 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://www.shoppingcart.bd',
-  'https://shoppingcart.bd',
-  'https://admin.shoppingcart.bd',
+  // 'https://www.shoppingcart.bd',
+  // 'https://shoppingcart.bd',
+  // 'https://admin.shoppingcart.bd',
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+      // Allow requests with no origin (e.g. mobile apps, curl)
+      if (!origin) return callback(null, true);
+      
+      // Allow exact matches in allowedOrigins
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // Allow local network and localhost on any port (e.g. 192.168.x.x, 10.x.x.x, localhost)
+      if (
+        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(
+          origin,
+        )
+      ) {
+        return callback(null, true);
       }
+
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
@@ -80,7 +91,7 @@ app.use(
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: 'Shopping Cart BD server is running!',
+    message: 'Mimi Sphere server is running!',
   });
 });
 

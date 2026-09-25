@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-import config from './index';
 import { MailPayload } from '../email/mail.interface';
+import config from './index';
 
 class Service {
   private async sendEmail(data: MailPayload) {
@@ -22,7 +22,7 @@ class Service {
     });
 
     const mailOptions: SMTPTransport.Options = {
-      from: `Shopping Cart BD <${from || config.smtp.user}>`,
+      from: `Mimi Sphere <${from || config.smtp.user}>`,
       to,
       subject,
       html: htmlContent,
@@ -49,7 +49,7 @@ class Service {
         <div style="max-width: 600px; margin: auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
           
           <div style="background-color: #6a1b9a; padding: 20px; text-align: center;">
-            <h2 style="margin: 0; color: #fff;">🛍️ Shopping Cart BD</h2>
+            <h2 style="margin: 0; color: #fff;">🛍️ Mimi Sphere</h2>
             <p style="color: #fff; margin-top: 5px;">${title}</p>
           </div>
   
@@ -58,10 +58,9 @@ class Service {
           </div>
   
           <div style="background-color: #f1f1f1; text-align: center; padding: 12px; font-size: 12px; color: #777;">
-            <p>&copy; ${new Date().getFullYear()} Shopping Cart BD — 
-              <a href="${
-                config.frontend_url
-              }" style="color: #6a1b9a; text-decoration: none;">Explore More</a>
+            <p>&copy; ${new Date().getFullYear()} Mimi Sphere — 
+              <a href="${config.frontend_url
+      }" style="color: #6a1b9a; text-decoration: none;">Explore More</a>
             </p>
           </div>
         </div>

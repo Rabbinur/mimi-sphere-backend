@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { BkashService } from './bkash.service';
-import { OrderModel, SuccessOrderModel } from '../orders/order.model';
+import { OrderModel } from '../orders/order.model';
 import { OrderServices } from '../orders/order.services';
 import config from '../../config';
 import { sendFBEvent } from '../../utils/facebookConversions';
@@ -13,9 +13,6 @@ export const createBkashPayment = async (req: Request, res: Response) => {
     
     // Find order to verify
     let order = await OrderModel.findOne({ order_id: orderId });
-    if (!order) {
-      order = await SuccessOrderModel.findOne({ order_id: orderId });
-    }
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
@@ -63,18 +60,6 @@ export const bkashCallback = async (req: Request, res: Response) => {
           },
           { new: true }
         );
-
-        if (!order) {
-          order = await SuccessOrderModel.findOneAndUpdate(
-            { order_id: orderId },
-            { 
-              payment_status: 'paid',
-              'online_payment_details.trx_id': response.trxID,
-              'online_payment_details.provider': 'bkash'
-            },
-            { new: true }
-          );
-        }
 
         if (order) {
           // Resolve product SKUs from DB

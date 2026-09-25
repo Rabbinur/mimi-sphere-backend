@@ -89,11 +89,66 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
     return acc;
   }, {});
 
+  // 🚫 Filter out products belonging to inactive / hidden categories
+  const inactiveCategories = await CategoryModel.find({ isActive: false }).select('_id');
+  const inactiveCategoryIds = inactiveCategories.map((c: any) => c._id);
+  const inactiveChildCategories = inactiveCategoryIds.length > 0
+    ? await CategoryModel.find({ parent_category_id: { $in: inactiveCategoryIds } }).select('_id')
+    : [];
+  const allInactiveCatIds = [
+    ...inactiveCategoryIds,
+    ...inactiveChildCategories.map((c: any) => c._id),
+  ];
+
   const searchQuery: any = { product_status: 'active' };
 
-  // 🔍 search - Using $text index for performance
+  // 🔍 Flexible, multi-field regex search for instant substring/prefix/multi-word matching
   if (searchTerm) {
-    searchQuery.$text = { $search: searchTerm };
+    const trimmed = searchTerm.trim();
+    const escapedSearchTerm = escapeRegex(trimmed);
+    const words = trimmed.split(/\s+/).filter(Boolean).map(escapeRegex);
+
+    const orConditions: any[] = [
+      { product_title: { $regex: escapedSearchTerm, $options: 'i' } },
+      { product_description: { $regex: escapedSearchTerm, $options: 'i' } },
+      { product_vendor: { $regex: escapedSearchTerm, $options: 'i' } },
+      { sku: { $regex: escapedSearchTerm, $options: 'i' } },
+      { url_handle: { $regex: escapedSearchTerm, $options: 'i' } },
+    ];
+
+    if (words.length > 1) {
+      orConditions.push({
+        $and: words.map((w: string) => ({
+          $or: [
+            { product_title: { $regex: w, $options: 'i' } },
+            { product_description: { $regex: w, $options: 'i' } },
+            { product_vendor: { $regex: w, $options: 'i' } },
+            { sku: { $regex: w, $options: 'i' } },
+          ],
+        })),
+      });
+    }
+
+    // Match if searchTerm matches category name (active only)
+    const matchingCategories = await CategoryModel.find({
+      isActive: { $ne: false },
+      $or: [
+        { name: { $regex: escapedSearchTerm, $options: 'i' } },
+        { slug: { $regex: escapedSearchTerm, $options: 'i' } },
+      ],
+    }).select('_id');
+
+    const validMatchingCategoryIds = matchingCategories
+      .map((c: any) => c._id)
+      .filter((id: any) => !allInactiveCatIds.some((inact: any) => inact.toString() === id.toString()));
+
+    if (validMatchingCategoryIds.length > 0) {
+      orConditions.push({
+        product_categories: { $in: validMatchingCategoryIds },
+      });
+    }
+
+    searchQuery.$or = orConditions;
   }
 
   // 🏷️ brand
@@ -107,7 +162,7 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
   // 📂 category
   if (category && category !== 'new-collection') {
     const categoryData = await categoryServices.getCategoryBySlug(category);
-    if (!categoryData) {
+    if (!categoryData || !categoryData._id || categoryData.isActive === false) {
       return res.status(200).json({
         success: true,
         message: 'Products fetched successfully',
@@ -115,7 +170,55 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
         pagination: { total: 0, page, limit, totalPages: 0 },
       });
     }
-    searchQuery.product_categories = categoryData._id;
+
+    const categoryIdStr = categoryData._id.toString();
+    const isCategoryInactive = allInactiveCatIds.some(
+      (id: any) => id.toString() === categoryIdStr,
+    );
+
+    if (isCategoryInactive) {
+      return res.status(200).json({
+        success: true,
+        message: 'Products fetched successfully',
+        data: [],
+        pagination: { total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
+    // Match parent category as well as any active subcategories under it
+    const childCategories = await CategoryModel.find({
+      parent_category_id: categoryData._id,
+      isActive: { $ne: false },
+    }).select('_id');
+    const allMatchingCatIds = [
+      categoryData._id,
+      ...childCategories.map((c: any) => c._id),
+    ].filter((id: any) => !allInactiveCatIds.some((inact: any) => inact.toString() === id.toString()));
+
+    if (allMatchingCatIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Products fetched successfully',
+        data: [],
+        pagination: { total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
+    if (allInactiveCatIds.length > 0) {
+      searchQuery.product_categories = {
+        $in: allMatchingCatIds,
+        $nin: allInactiveCatIds,
+      };
+    } else {
+      searchQuery.product_categories = { $in: allMatchingCatIds };
+    }
+  } else if (allInactiveCatIds.length > 0) {
+    searchQuery.product_categories = { $nin: allInactiveCatIds };
+  }
+
+  // 🌟 New arrival filter if requested explicitly
+  if (req.query.is_new_arrival === 'true') {
+    searchQuery.is_new_arrival = true;
   }
 
   // ✅ VARIANT FILTER — Optimized for performance using exact matches
@@ -161,7 +264,7 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
   ];
 
   if (searchTerm && (!req.query.sort || req.query.sort === 'latest')) {
-    sortQuery = { score: { $meta: 'textScore' } };
+    sortQuery = { createdAt: -1 };
   } else if (sort === 'lowToHigh') {
     sortQuery = { product_price: 1 };
   } else if (sort === 'highToLow') {
@@ -190,9 +293,13 @@ const getAllProducts = catchAsync(async (req: Request, res: Response) => {
     compare_at_price: product.compare_at_price,
     discount_percentage: Math.round(product.discount_percentage ?? 0),
     product_vendor: product.product_vendor,
+    product_categories: product.product_categories,
     product_variants: product.product_variants,
     quantity: product.quantity,
     moq: product.moq,
+    is_featured: product.is_featured,
+    is_trendy: product.is_trendy,
+    is_new_arrival: product.is_new_arrival,
     is_pre_order: product.is_pre_order,
     pre_order_message: product.pre_order_message,
     is_free_delivery: product.is_free_delivery,
@@ -339,6 +446,29 @@ const getProductsByCategory = catchAsync(
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
+
+    const targetCategory = await CategoryModel.findById(id);
+    if (!targetCategory || targetCategory.isActive === false) {
+      return res.status(200).json({
+        success: true,
+        message: 'Products fetched successfully',
+        data: [],
+        pagination: { total: 0, page, limit, totalPages: 0 },
+      });
+    }
+
+    if (targetCategory.parent_category_id) {
+      const parent = await CategoryModel.findById(targetCategory.parent_category_id);
+      if (parent && parent.isActive === false) {
+        return res.status(200).json({
+          success: true,
+          message: 'Products fetched successfully',
+          data: [],
+          pagination: { total: 0, page, limit, totalPages: 0 },
+        });
+      }
+    }
+
     const searchQuery = { product_categories: id, product_status: 'active' };
     const result = await paginate(Product, searchQuery, page, limit);
 
@@ -569,6 +699,51 @@ const scrapeProduct = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getInventory = catchAsync(async (req: Request, res: Response) => {
+  const { page, per_page, search, sort_by, sort_order, status_filter } = req.query;
+
+  const result = await ProductServices.getInventoryFromDB({
+    page: page ? Number(page) : undefined,
+    per_page: per_page ? Number(per_page) : undefined,
+    search: search ? String(search) : undefined,
+    sort_by: sort_by ? String(sort_by) : undefined,
+    sort_order: sort_order === 'asc' || sort_order === 'desc' ? sort_order : undefined,
+    status_filter: status_filter as any,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Inventory records fetched successfully',
+    data: result,
+  });
+});
+
+const updateInventoryStock = catchAsync(async (req: Request, res: Response) => {
+  const { id, quantity } = req.body;
+  const result = await ProductServices.updateInventoryQuantityInDB(id, Number(quantity));
+
+  res.status(200).json({
+    success: true,
+    message: 'Inventory quantity updated successfully',
+    data: result,
+  });
+});
+
+const bulkUpdateInventoryStock = catchAsync(async (req: Request, res: Response) => {
+  const { ids, action, value } = req.body;
+  const result = await ProductServices.bulkUpdateInventoryQuantityInDB(
+    ids,
+    action,
+    Number(value),
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Bulk inventory updated successfully',
+    data: result,
+  });
+});
+
 export const ProductController = {
   createProduct,
   getAllProducts,
@@ -584,4 +759,7 @@ export const ProductController = {
   getTrendyProducts,
   scrapeProduct,
   syncToGoogleMerchant,
+  getInventory,
+  updateInventoryStock,
+  bulkUpdateInventoryStock,
 };

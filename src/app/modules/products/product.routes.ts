@@ -25,6 +25,21 @@ router.get(
   verifyToken([UserRole.ADMIN]),
   ProductController.getProductsForAdmin,
 );
+router.get(
+  '/inventory',
+  verifyToken([UserRole.ADMIN]),
+  ProductController.getInventory,
+);
+router.put(
+  '/inventory/update-stock',
+  verifyToken([UserRole.ADMIN]),
+  ProductController.updateInventoryStock,
+);
+router.put(
+  '/inventory/bulk-update-stock',
+  verifyToken([UserRole.ADMIN]),
+  ProductController.bulkUpdateInventoryStock,
+);
 router.get('/slug/:slug', ProductController.getProductBySlug);
 router.get('/by-category/:id', ProductController.getProductsByCategory);
 router.get('/', ProductController.getAllProducts);

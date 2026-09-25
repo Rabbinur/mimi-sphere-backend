@@ -224,6 +224,30 @@ const handleGetAllOrders = async (req: Request, res: Response) => {
   }
 };
 
+const getChannelOrdersManagement = async (req: Request, res: Response) => {
+  try {
+    const { channel, search, status, startDate, endDate, page, limit } = req.query;
+
+    const result = await OrderServices.getChannelOrdersManagement({
+      channel: (channel as any) || 'ONLINE',
+      search: search as string | undefined,
+      status: status as string | undefined,
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Channel orders retrieved successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 /* ================= SINGLE ORDER ================= */
 const singleOrder = async (req: Request, res: Response) => {
   try {
@@ -288,14 +312,25 @@ const singleOrderByOrderId = async (req: Request, res: Response) => {
       responseData.products = mappedProducts;
       return res.status(200).json({ success: true, data: responseData });
     } else {
-      // Return sanitized order details for tracking / analytics
+      // Return sanitized order details for success page, tracking & analytics
       return res.status(200).json({
         success: true,
         data: {
           _id: result._id,
           order_id: result.order_id,
+          customer_name: result.customer_name,
+          phone: result.phone,
+          district: result.district,
+          upazila: result.upazila,
+          village_or_area: result.village_or_area,
+          order_status: result.order_status,
+          payment_method: result.payment_method,
+          payment_status: result.payment_status,
+          delivery_charge: result.delivery_charge || 0,
+          discount_amount: result.discount_amount || 0,
           total_price: result.total_price,
           currency: 'BDT',
+          createdAt: result.createdAt,
           products: mappedProducts,
         },
       });
@@ -377,11 +412,8 @@ const orderStatusUpdate = async (req: Request, res: Response) => {
       });
 
       // Update the order to mark purchase event as fired
-      const { OrderModel, SuccessOrderModel } = await import('./order.model');
-      const updated = await OrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
-      if (!updated) {
-        await SuccessOrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
-      }
+      const { OrderModel } = await import('./order.model');
+      await OrderModel.findByIdAndUpdate(result._id, { is_purchase_event_fired: true });
     }
 
     res.status(200).json({
@@ -552,6 +584,7 @@ export const OrderController = {
   createOrder,
   myOrders,
   handleGetAllOrders,
+  getChannelOrdersManagement,
   singleOrder,
   cancelOrder,
   orderStatusUpdate,

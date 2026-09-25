@@ -8,7 +8,9 @@ const CategorySchema = new Schema<TCategory>(
         description: { type: String },
         parent_category_id: { type: Types.ObjectId, ref: 'Category', default: null },
         imageUrl: { type: String },
+        bannerImage: { type: String, default: undefined },
         isActive: { type: Boolean, default: true },
+        showInNavbar: { type: Boolean, default: true },
         order: { type: Number, default: 0 },
     },
     {

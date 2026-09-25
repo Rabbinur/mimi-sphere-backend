@@ -12,6 +12,8 @@ export interface TProduct {
 
   product_price: number;
   compare_at_price?: number;
+  cost_price?: number;
+  barcode?: string;
 
   discount_percentage?: number;
 
@@ -38,6 +40,7 @@ export interface TProduct {
 
   is_featured?: boolean;
   is_trendy?: boolean;
+  is_new_arrival?: boolean;
   is_limited_time_offer?: boolean;
 
   product_attributes?: {
@@ -53,8 +56,11 @@ export interface TProduct {
   product_variants?: {
     variant_option_values: Map<string, string> | Record<string, string>;
     variant_price: number;
+    cost_price?: number;
     variant_quantity?: number;
     compare_at_price?: number;
+    sku?: string;
+    barcode?: string;
     image?: string;
   }[];
 
@@ -63,4 +69,19 @@ export interface TProduct {
 
   is_pre_order?: boolean;
   pre_order_message?: string;
+
+  brand?: Types.ObjectId | string;
+  seo_title?: string;
+  seo_description?: string;
+  tags?: string[];
+  shipping_policy?: string;
+  return_policy?: string;
+  continue_selling?: boolean;
+  charge_tax?: boolean;
+  physical_details?: {
+    weight?: string;
+    height?: string;
+    width?: string;
+    length?: string;
+  };
 }
