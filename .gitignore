@@ -1,7 +1,5 @@
 node_modules
 dist
-.env
-.env.*
 !.env.example
 .vercel
 uploads
@@ -11,3 +9,4 @@ google-analytics-key.json
 service-account.json
 *.pem
 *.key
+config.bat

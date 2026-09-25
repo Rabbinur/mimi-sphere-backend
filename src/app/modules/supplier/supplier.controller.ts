@@ -7,6 +7,15 @@ import { AppError } from '../../utils/errorHandler';
 const createSupplier = catchAsync(async (req: Request, res: Response) => {
   const supplierData = req.body;
 
+  if (
+    !supplierData.phone ||
+    !/^(?:\+?8801|01)[3-9]\d{8}$/.test(
+      supplierData.phone.trim().replace(/[\s-]/g, '')
+    )
+  ) {
+    throw new AppError('সঠিক ১১ ডিজিটের ফোন নম্বর দিন (যেমন: 017XXXXXXXX)', 400);
+  }
+
   const exists = await SupplierModel.findOne({ name: supplierData.name });
   if (exists) {
     throw new AppError('Supplier with this name already exists.', 400);
@@ -53,6 +62,15 @@ const getSupplierById = catchAsync(async (req: Request, res: Response) => {
 const updateSupplier = catchAsync(async (req: Request, res: Response) => {
   const supplierId: string = req.params.id;
   const supplierData = req.body;
+
+  if (
+    supplierData.phone &&
+    !/^(?:\+?8801|01)[3-9]\d{8}$/.test(
+      supplierData.phone.trim().replace(/[\s-]/g, '')
+    )
+  ) {
+    throw new AppError('সঠিক ১১ ডিজিটের ফোন নম্বর দিন (যেমন: 017XXXXXXXX)', 400);
+  }
 
   const updatedSupplier = await supplierServices.updateSupplier(supplierId, supplierData);
 
