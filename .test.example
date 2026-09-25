@@ -1,5 +1,5 @@
 PORT=5000
-DATABASE_URL=mongodb+srv://rabbinur-distributor:Uob22r9VhWgub9mF@cluster0.7mvqmtg.mongodb.net/mimisphere?appName=Cluster0
+DATABASE_URL=
 NODE_ENV=development
 
 
@@ -43,6 +43,4 @@ SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
-SMTP_USER=baa3c9001@smtp-brevo.com
-SMTP_PASS=xsmtpsib-ea7698a84d7d4d637e7e351cae4598b709e40219033e7c84be6123391a13ccf7-WEPAKAQjTzlkfxuv
 FRONTEND_URL=http://localhost:3001
