@@ -23,17 +23,17 @@ router.get(
 
 router.get(
   '/',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.handleGetAllOrders,
 );
 router.get(
   '/channel-orders',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.getChannelOrdersManagement,
 );
 router.get(
   '/:id',
-  verifyToken([UserRole.USER, UserRole.ADMIN]),
+  verifyToken([UserRole.USER, UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.singleOrder,
 );
 router.get(
@@ -42,12 +42,12 @@ router.get(
 );
 router.get(
   '/admin/:id',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.singleOrder,
 );
 router.put(
   '/update/:id',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.orderStatusUpdate,
 );
 router.delete(
@@ -62,22 +62,22 @@ router.get(
 );
 router.get(
   '/poly-label/:id',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.downloadPolyLabel,
 );
 router.post(
   '/send-to-steadfast/:id',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.sendToSteadfast,
 );
 router.post(
   '/send-to-carrybee/:id',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.sendToCarrybee,
 );
 router.post(
   '/check-fraud',
-  verifyToken([UserRole.ADMIN]),
+  verifyToken([UserRole.ADMIN, UserRole.CASHIER]),
   OrderController.checkFraud,
 );
 

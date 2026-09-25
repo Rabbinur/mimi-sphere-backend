@@ -37,12 +37,44 @@ class PosController {
   });
 
   createPosOrder = catchAsync(async (req: Request, res: Response) => {
-    const result = await posService.createPosOrder(req.body);
+    const result = await posService.createPosOrder(req.body, req.user);
 
     sendResponse(res, {
       statusCode: HttpStatusCode.CREATED,
       success: true,
       message: 'POS Order created successfully',
+      data: result,
+    });
+  });
+
+  getCashierShiftSummary = catchAsync(async (req: Request, res: Response) => {
+    const cashierId = (req.query.cashier_id as string) || (req.user as any)?.id || (req.user as any)?._id;
+    const result = await posService.getCashierShiftSummary(
+      cashierId ? String(cashierId) : undefined,
+      req.query.date as string | undefined,
+    );
+
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: 'Cashier Shift summary fetched successfully',
+      data: result,
+    });
+  });
+
+  getCashierReports = catchAsync(async (req: Request, res: Response) => {
+    const { cashier_id, period, start_date, end_date } = req.query;
+    const result = await posService.getCashierReports({
+      cashier_id: cashier_id ? String(cashier_id) : undefined,
+      period: (period as 'daily' | 'weekly' | 'monthly') || 'daily',
+      start_date: start_date ? String(start_date) : undefined,
+      end_date: end_date ? String(end_date) : undefined,
+    });
+
+    sendResponse(res, {
+      statusCode: HttpStatusCode.OK,
+      success: true,
+      message: 'Cashier sales report fetched successfully',
       data: result,
     });
   });

@@ -171,7 +171,7 @@ class PosService {
   }
 
   // 3. Create POS In-Store Order
-  async createPosOrder(payload: IPosOrderPayload) {
+  async createPosOrder(payload: IPosOrderPayload, currentUser?: any) {
     if (!payload.items || payload.items.length === 0) {
       throw new ApiError(HttpStatusCode.BAD_REQUEST, 'Cart cannot be empty');
     }
@@ -221,6 +221,17 @@ class PosService {
       total_price: it.total || it.price * it.quantity,
     }));
 
+    // Capture Cashier info from logged in user
+    let cashierInfo = undefined;
+    if (currentUser) {
+      const cashierId = currentUser.id || currentUser._id || currentUser.userId;
+      cashierInfo = {
+        id: cashierId ? new mongoose.Types.ObjectId(String(cashierId)) : undefined,
+        name: currentUser.name || currentUser.full_name || 'Store Cashier',
+        email: currentUser.email || '',
+      };
+    }
+
     // Create Order in DB
     const order = await Order.create({
       order_id: orderNumber,
@@ -241,6 +252,7 @@ class PosService {
       payment_method: payload.payment_method || 'POS_CASH',
       delivery_charge: 0,
       notes: payload.note || 'In-Store POS Counter Purchase',
+      cashier: cashierInfo,
     });
 
     // Update or create PosCustomer record for offline customer
@@ -889,6 +901,116 @@ class PosService {
     return {
       synced_count: results.filter((r) => r.status === 'success').length,
       expenses: results,
+    };
+  }
+
+  // 17. Get specific cashier shift summary for the current day / date
+  async getCashierShiftSummary(cashierId?: string, dateStr?: string) {
+    const targetDate = dateStr ? new Date(dateStr) : new Date();
+    const startOfDay = new Date(new Date(targetDate).setHours(0, 0, 0, 0));
+    const endOfDay = new Date(new Date(targetDate).setHours(23, 59, 59, 999));
+
+    const filter: any = {
+      order_type: 'POS',
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    };
+
+    if (cashierId) {
+      filter['cashier.id'] = new mongoose.Types.ObjectId(String(cashierId));
+    }
+
+    const orders = await Order.find(filter).lean();
+
+    let totalSales = 0;
+    let cashSales = 0;
+    let digitalSales = 0;
+    let totalDiscount = 0;
+    const soldItemsMap = new Map<string, { title: string; quantity: number; total: number }>();
+
+    for (const ord of orders) {
+      const orderTotal = Number(ord.total_price) || 0;
+      totalSales += orderTotal;
+      totalDiscount += Number(ord.discount_amount) || 0;
+
+      if (ord.payment_method === 'POS_CASH') {
+        cashSales += orderTotal;
+      } else {
+        digitalSales += orderTotal;
+      }
+
+      if (ord.products && Array.isArray(ord.products)) {
+        for (const p of ord.products) {
+          const itemKey = p.title || 'Unknown Item';
+          const existing = soldItemsMap.get(itemKey) || { title: itemKey, quantity: 0, total: 0 };
+          existing.quantity += Number(p.quantity) || 1;
+          existing.total += Number(p.total_price) || 0;
+          soldItemsMap.set(itemKey, existing);
+        }
+      }
+    }
+
+    return {
+      date: startOfDay.toISOString().split('T')[0],
+      total_orders: orders.length,
+      total_sales: totalSales,
+      cash_sales: cashSales,
+      digital_sales: digitalSales,
+      total_discount: totalDiscount,
+      products_sold: Array.from(soldItemsMap.values()),
+    };
+  }
+
+  // 18. Get aggregated cashier reports (daily, weekly, monthly)
+  async getCashierReports(query: {
+    cashier_id?: string;
+    period?: 'daily' | 'weekly' | 'monthly';
+    start_date?: string;
+    end_date?: string;
+  }) {
+    const now = new Date();
+    let startDate = new Date();
+    const endDate = query.end_date ? new Date(query.end_date) : new Date(new Date().setHours(23, 59, 59, 999));
+
+    if (query.start_date) {
+      startDate = new Date(query.start_date);
+    } else if (query.period === 'weekly') {
+      startDate = new Date(new Date().setDate(now.getDate() - 7));
+    } else if (query.period === 'monthly') {
+      startDate = new Date(new Date().setMonth(now.getMonth() - 1));
+    } else {
+      // daily
+      startDate = new Date(new Date().setHours(0, 0, 0, 0));
+    }
+
+    const matchStage: any = {
+      order_type: 'POS',
+      createdAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (query.cashier_id) {
+      matchStage['cashier.id'] = new mongoose.Types.ObjectId(String(query.cashier_id));
+    }
+
+    const report = await Order.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: '$cashier.id',
+          cashier_name: { $first: '$cashier.name' },
+          cashier_email: { $first: '$cashier.email' },
+          total_orders: { $sum: 1 },
+          total_sales: { $sum: '$total_price' },
+          total_discount: { $sum: '$discount_amount' },
+        },
+      },
+      { $sort: { total_sales: -1 } },
+    ]);
+
+    return {
+      period: query.period || 'daily',
+      from: startDate,
+      to: endDate,
+      cashiers: report,
     };
   }
 }

@@ -78,6 +78,13 @@ export type TOrder = {
   };
   is_purchase_event_fired?: boolean;
 
+  /* -------- Cashier / Staff Tracking -------- */
+  cashier?: {
+    id?: string;
+    name?: string;
+    email?: string;
+  };
+
   /* -------- Timestamps (added by Mongoose) -------- */
   createdAt?: Date;
   updatedAt?: Date;

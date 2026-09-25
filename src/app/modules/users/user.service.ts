@@ -83,6 +83,7 @@ class Service {
 
     const jwtPayload = {
       id: isUserExist?.id,
+      name: isUserExist?.name,
       email: isUserExist?.email,
       role: isUserExist?.role,
     };

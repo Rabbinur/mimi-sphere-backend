@@ -130,6 +130,12 @@ export const OrderSchema = new Schema<TOrder>(
       external_id: { type: String, trim: true },
     },
     is_purchase_event_fired: { type: Boolean, default: false },
+
+    cashier: {
+      id: { type: Schema.Types.ObjectId, ref: 'User' },
+      name: { type: String, trim: true },
+      email: { type: String, trim: true },
+    },
   },
   { timestamps: true },
 );
