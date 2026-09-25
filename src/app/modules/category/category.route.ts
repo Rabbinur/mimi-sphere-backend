@@ -15,6 +15,11 @@ router.put(
   verifyToken([UserRole.ADMIN]),
   categoryController.updateCategoryOrder,
 );
+router.patch(
+  '/reorder',
+  verifyToken([UserRole.ADMIN]),
+  categoryController.updateCategoryOrder,
+);
 router.get('/:id', categoryController.getCategoryById);
 router.get('/', categoryController.getAllCategories);
 router.put(

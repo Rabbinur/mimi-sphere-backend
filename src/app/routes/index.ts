@@ -27,13 +27,31 @@ import { ReviewRoutes } from '../modules/review/review.route';
 import { CheckoutLeadRoutes } from '../modules/checkout-lead/checkout-lead.routes';
 import { CampaignRoutes } from '../modules/campaign/campaign.routes';
 import { CollectionRoutes } from '../modules/collection/collection.route';
-
+import { PosRoutes } from '../modules/pos/pos.routes';
+import { CustomerReviewRoutes } from '../modules/customer-review/customerReview.routes';
+import { ReportsRoutes } from '../modules/reports/reports.routes';
+import { DiscountRoutes } from '../modules/discount/discount.route';
+import { supplierRoutes } from '../modules/supplier/supplier.route';
+import { purchaseRoutes } from '../modules/purchase/purchase.route';
 
 const router = Router();
 
 const moduleRoutes = [
   {
+    path: '/discounts',
+    route: DiscountRoutes,
+  },
+  {
+    path: '/reports',
+    route: ReportsRoutes,
+  },
+  {
+    path: '/admin/pos',
+    route: PosRoutes,
+  },
+  {
     path: '/campaigns',
+
     route: CampaignRoutes,
   },
   {
@@ -130,8 +148,20 @@ const moduleRoutes = [
     route: ReviewRoutes,
   },
   {
+    path: '/customer-reviews',
+    route: CustomerReviewRoutes,
+  },
+  {
     path: '/checkout-leads',
     route: CheckoutLeadRoutes,
+  },
+  {
+    path: '/suppliers',
+    route: supplierRoutes,
+  },
+  {
+    path: '/purchases',
+    route: purchaseRoutes,
   },
 ];
 

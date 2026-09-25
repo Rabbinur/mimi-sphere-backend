@@ -1,6 +1,6 @@
 import { IUser } from './user.interface';
 import User from './user.model';
-import { OrderModel as Order, SuccessOrderModel as SuccessOrder } from '../orders/order.model';
+import { OrderModel as Order } from '../orders/order.model';
 import { Product } from '../products/product.model';
 import { CategoryModel as Category } from '../category/category.model';
 import ApiError from '../../middlewares/error';
@@ -228,9 +228,8 @@ class Service {
     }
 
     // Get Order Stats
-    const activeOrders = await Order.find({ email: user.email });
-    const successOrders = await SuccessOrder.find({ email: user.email });
-    const orders = [...activeOrders, ...successOrders];
+    // Get Order Stats
+    const orders = await Order.find({ email: user.email });
 
     const orderStats = {
       placed_orders: orders.filter((o: any) => o.order_status === 'pending')
@@ -248,15 +247,9 @@ class Service {
       total_orders: orders.length,
     };
 
-    const activeRecent = await Order.find({ email: user.email })
+    const recentOrders = await Order.find({ email: user.email })
       .sort({ createdAt: -1 })
       .limit(5);
-    const successRecent = await SuccessOrder.find({ email: user.email })
-      .sort({ createdAt: -1 })
-      .limit(5);
-    const recentOrders = [...activeRecent, ...successRecent]
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5);
 
     return {
       ...user.toObject(),
@@ -458,9 +451,7 @@ class Service {
       quantity: { $lt: 10 },
     });
 
-    const activeOrders = await Order.find({});
-    const successOrders = await SuccessOrder.find({});
-    const allOrders = [...activeOrders, ...successOrders];
+    const allOrders = await Order.find({});
     const totalOrders = allOrders.length;
 
     const orderStatus = {
@@ -484,11 +475,7 @@ class Service {
       0,
     );
 
-    const activeRecent = await Order.find({}).sort({ createdAt: -1 }).limit(10);
-    const successRecent = await SuccessOrder.find({}).sort({ createdAt: -1 }).limit(10);
-    const recentOrders = [...activeRecent, ...successRecent]
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10);
+    const recentOrders = await Order.find({}).sort({ createdAt: -1 }).limit(10);
 
     // Chart data (last 7 days)
     const chart = [];

@@ -1,5 +1,5 @@
 /**
- * Professional Email Templates for Shopping Cart BD
+ * Professional Email Templates for Mimi Sphere
  * Styled to match the Invoice PDF design.
  */
 
@@ -23,12 +23,12 @@ const headerTemplate = `
         line-height: 1.5;
       ">
         <img 
-          src="https://www.shoppingcart.bd/logo.png" 
-          alt="Shopping Cart BD" 
+          src="https://mimisphere.com/logo.png" 
+          alt="Mimi Sphere" 
           style="height: 30px; margin-bottom: 2px;"
         /><br/>
-        info@shoppingcart.bd<br/>
-        +8801722597565
+        info@mimisphere.com<br/>
+        +8801719713061
       </td>
 
     </tr>
@@ -62,9 +62,9 @@ const footerTemplate = `
           font-size: 12px;
           line-height: 1.6;
         ">
-          Phone: +8801722597565<br/>
-          Email: info@shoppingcart.bd<br/>
-          Website: www.shoppingcart.bd
+          Phone: +8801719713061<br/>
+          Email: info@mimisphere.com<br/>
+          Website: www.mimisphere.com
         </span>
       </td>
 
@@ -88,9 +88,9 @@ const footerTemplate = `
 
     <!-- Facebook -->
     <td style="padding-left:6px;">
-      <a href="https://www.facebook.com/shoppingcartbd.official" target="_blank">
+      <a href="https://www.facebook.com/mimispherebd" target="_blank">
         <img 
-          src="https://www.shoppingcart.bd/icons/facebook.png" 
+          src="https://mimisphere.com/icons/facebook.png" 
           width="18" 
           style="display:block; border:0;"
         />
@@ -99,9 +99,9 @@ const footerTemplate = `
 
     <!-- Instagram -->
     <td style="padding-left:6px;">
-      <a href="https://www.instagram.com/shoppingcart.bd/" target="_blank">
+      <a href="https://www.instagram.com/mimisphere/" target="_blank">
         <img 
-          src="https://www.shoppingcart.bd/icons/instagram.png" 
+          src="https://mimisphere.com/icons/instagram.png" 
           width="18" 
           style="display:block; border:0;"
         />
@@ -110,9 +110,9 @@ const footerTemplate = `
 
     <!-- WhatsApp -->
     <td style="padding-left:6px;">
-      <a href="https://wa.link/fabxoj" target="_blank">
+      <a href="https://wa.me/8801719713061" target="_blank">
         <img 
-          src="https://www.shoppingcart.bd/icons/whatsapp.png" 
+          src="https://mimisphere.com/icons/whatsapp.png" 
           width="18" 
           style="display:block; border:0;"
         />
@@ -145,7 +145,7 @@ const footerTemplate = `
                 font-size: 12px;
                 font-weight: bold;
               ">
-                Shopping Cart BD
+                Mimi Sphere
               </span>
             </td>
           </tr>
@@ -201,7 +201,7 @@ export const getOTPTemplate = (
 
 export const getOrderTemplate = (order: any) => {
   const { customer_name, order_id, phone, order_status, total_price } = order;
-  const trackUrl = `https://shoppingcart.bd/track-order?orderId=${order_id}&phone=${phone}`;
+  const trackUrl = `https://mimisphere.com/track-order?orderId=${order_id}&phone=${phone}`;
 
   return `
     <!DOCTYPE html>
@@ -282,9 +282,9 @@ export const getPasswordChangeTemplate = (name: string) => {
         <div class="content">
           <h2 style="margin: 0 0 15px 0; color: ${primaryColor};">Security Update</h2>
           <p style="margin:0; font-size: 16px;">Hi <strong>${name}</strong>,</p>
-          <p style="margin:15px 0; font-size: 15px;">This is a courtesy notification to let you know that the password for your <strong>Shopping Cart BD</strong> account was recently changed.</p>
+          <p style="margin:15px 0; font-size: 15px;">This is a courtesy notification to let you know that the password for your <strong>Mimi Sphere</strong> account was recently changed.</p>
           <div class="warning">
-            <strong>Not you?</strong> If you did not make this change, please contact our support team immediately at <strong>+8801722 597565</strong> to secure your account.
+            <strong>Not you?</strong> If you did not make this change, please contact our support team immediately at <strong>+8801719713061</strong> to secure your account.
           </div>
         </div>
         ${footerTemplate}
@@ -320,9 +320,9 @@ export const getWelcomeTemplate = (name: string) => {
         </div>
         <div class="content">
           <p style="font-size: 18px; margin:0;">Hi <strong>${name}</strong>,</p>
-          <p style="margin:20px 0; font-size: 16px; color: #555;">We're thrilled to have you join <strong>Shopping Cart BD</strong>. You're now part of a community that values quality, authenticity, and the best deals in Bangladesh.</p>
+          <p style="margin:20px 0; font-size: 16px; color: #555;">We're thrilled to have you join <strong>Mimi Sphere</strong>. You're now part of a community that values quality, authenticity, and the best deals in Bangladesh.</p>
           <p style="font-size: 15px; color: #666;">Ready to explore? Click the button below to start your shopping journey.</p>
-          <a href="https://shoppingcart.bd" class="btn">Start Shopping</a>
+          <a href="https://mimisphere.com" class="btn">Start Shopping</a>
         </div>
         ${footerTemplate}
       </div>

@@ -7,7 +7,9 @@ export interface TCategory {
     description?: string;
     parent_category_id?: Types.ObjectId | null;
     imageUrl?: string;
+    bannerImage?: string;
     isActive?: boolean;
+    showInNavbar?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
     sub_categories?: TCategory[];

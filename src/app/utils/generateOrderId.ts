@@ -1,4 +1,4 @@
-import { OrderModel, SuccessOrderModel } from '../modules/orders/order.model';
+import { OrderModel } from '../modules/orders/order.model';
 
 export const generateOrderId = async () => {
   const now = new Date();
@@ -14,19 +14,10 @@ export const generateOrderId = async () => {
     .sort({ createdAt: -1 })
     .select('order_id');
 
-  const lastOrderSuccess = await SuccessOrderModel.findOne({
-    order_id: { $regex: `^ORD-${key}` },
-  })
-    .sort({ createdAt: -1 })
-    .select('order_id');
-
   let lastSeq = 0;
 
   if (lastOrderActive?.order_id) {
-    lastSeq = Math.max(lastSeq, parseInt(lastOrderActive.order_id.slice(-3), 10));
-  }
-  if (lastOrderSuccess?.order_id) {
-    lastSeq = Math.max(lastSeq, parseInt(lastOrderSuccess.order_id.slice(-3), 10));
+    lastSeq = parseInt(lastOrderActive.order_id.slice(-3), 10);
   }
 
   const nextSeq = lastSeq + 1;

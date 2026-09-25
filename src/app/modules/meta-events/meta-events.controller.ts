@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
+import config from '../../config';
 import { catchAsync } from '../../utils/catchAsync';
 import { sendFBEvent } from '../../utils/facebookConversions';
-import { MetaEventModel } from './meta-events.model';
-import { Product } from '../products/product.model';
 import { CategoryModel } from '../category/category.model';
-import config from '../../config';
+import { Product } from '../products/product.model';
+import { MetaEventModel } from './meta-events.model';
 
 const escapeXml = (unsafe: string): string => {
   if (!unsafe) return '';
@@ -114,9 +114,9 @@ const generateCatalogFeed = catchAsync(async (req: Request, res: Response) => {
   res.write('<?xml version="1.0"?>\n');
   res.write('<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n');
   res.write('  <channel>\n');
-  res.write('    <title>Shopping Cart BD Product Catalog</title>\n');
+  res.write('    <title>Mimi Sphere Product Catalog</title>\n');
   res.write(`    <link>${config.frontend_url}</link>\n`);
-  res.write('    <description>Facebook Product Catalog Feed for Shopping Cart BD</description>\n');
+  res.write('    <description>Facebook Product Catalog Feed for Mimi Sphere</description>\n');
 
   // Pre-fetch categories to avoid N+1 queries during cursor iteration
   const categories = await CategoryModel.find({ isActive: true }).lean();
@@ -146,7 +146,7 @@ const generateCatalogFeed = catchAsync(async (req: Request, res: Response) => {
     const escapedDescription = cleanHtml(product.product_description || '');
     const escapedLink = escapeXml(`${config.frontend_url}/products/${urlHandle}`);
     const escapedImageLink = escapeXml(image);
-    const brand = escapeXml(product.product_vendor || 'Shopping Cart BD');
+    const brand = escapeXml(product.product_vendor || 'Mimi Sphere');
 
     let availability = 'in stock';
     if (product.is_pre_order) {

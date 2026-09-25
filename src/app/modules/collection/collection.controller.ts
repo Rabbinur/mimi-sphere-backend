@@ -26,11 +26,12 @@ const createCollection = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllCollections = catchAsync(async (req: Request, res: Response) => {
-  const { page, limit, searchTerm } = req.query;
+  const { page, limit, searchTerm, isActive } = req.query;
   const result = await collectionServices.getAllCollections(
     page as string,
     limit as string,
     searchTerm as string,
+    isActive as string,
   );
   res.status(200).json({
     success: true,

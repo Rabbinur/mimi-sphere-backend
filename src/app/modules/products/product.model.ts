@@ -43,6 +43,17 @@ const ProductSchema = new Schema<TProduct>(
       default: 0,
     },
 
+    cost_price: {
+      type: Number,
+      default: 0,
+    },
+
+    barcode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     discount_percentage: {
       type: Number,
       default: 0,
@@ -97,6 +108,47 @@ const ProductSchema = new Schema<TProduct>(
       default: '',
     },
 
+    brand: {
+      type: Schema.Types.Mixed,
+      ref: 'Brand',
+      set: (v: any) => (v === '' || v === null ? undefined : v),
+    },
+
+    seo_title: {
+      type: String,
+      default: '',
+    },
+    seo_description: {
+      type: String,
+      default: '',
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    shipping_policy: {
+      type: String,
+      default: '',
+    },
+    return_policy: {
+      type: String,
+      default: '',
+    },
+    continue_selling: {
+      type: Boolean,
+      default: false,
+    },
+    charge_tax: {
+      type: Boolean,
+      default: true,
+    },
+    physical_details: {
+      weight: { type: String, default: '' },
+      height: { type: String, default: '' },
+      width: { type: String, default: '' },
+      length: { type: String, default: '' },
+    },
+
     product_status: {
       type: String,
       enum: ['draft', 'active'],
@@ -118,6 +170,10 @@ const ProductSchema = new Schema<TProduct>(
       default: false,
     },
     is_trendy: {
+      type: Boolean,
+      default: false,
+    },
+    is_new_arrival: {
       type: Boolean,
       default: false,
     },
@@ -163,9 +219,21 @@ const ProductSchema = new Schema<TProduct>(
           type: Number,
           required: true,
         },
+        cost_price: {
+          type: Number,
+          default: 0,
+        },
         variant_quantity: {
           type: Number,
           default: 0,
+        },
+        sku: {
+          type: String,
+          default: '',
+        },
+        barcode: {
+          type: String,
+          default: '',
         },
         compare_at_price: Number,
         image: {

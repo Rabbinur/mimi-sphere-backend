@@ -493,6 +493,159 @@ const importProductsFromCj = async (
   return importedProducts;
 };
 
+const getInventoryFromDB = async (query: {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  status_filter?: 'low_stock' | 'out_of_stock' | 'in_stock';
+}) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.per_page) || 10;
+  const skip = (page - 1) * limit;
+
+  const filter: any = {};
+  if (query.search) {
+    const searchRegex = new RegExp(query.search, 'i');
+    filter.$or = [
+      { product_title: searchRegex },
+      { sku: searchRegex },
+      { 'product_variants.sku': searchRegex },
+    ];
+  }
+
+  const products = await Product.find(filter).lean();
+
+  let allVariants: any[] = [];
+  products.forEach((p: any) => {
+    if (p.product_variants && p.product_variants.length > 0) {
+      p.product_variants.forEach((v: any, idx: number) => {
+        const labels = v.variant_option_values
+          ? (v.variant_option_values instanceof Map 
+              ? Array.from(v.variant_option_values.values()).join(' / ')
+              : Object.values(v.variant_option_values).join(' / '))
+          : `Variant ${idx + 1}`;
+
+        allVariants.push({
+          id: String(v._id || `${p._id}_${idx}`),
+          product_id: String(p._id),
+          product: {
+            name: p.product_title,
+            thumbnail: p.thumbnail,
+          },
+          product_image: v.image || p.thumbnail,
+          combination_label: labels,
+          sku: v.sku || p.sku || '—',
+          barcode: v.barcode || v.sku || p.sku || `BAR-${p._id}-${idx}`,
+          available_quantity: v.variant_quantity ?? 0,
+          total_sale: p.total_sale || 0,
+        });
+      });
+    } else {
+      allVariants.push({
+        id: String(p._id),
+        product_id: String(p._id),
+        product: {
+          name: p.product_title,
+          thumbnail: p.thumbnail,
+        },
+        product_image: p.thumbnail,
+        combination_label: undefined,
+        sku: p.sku || '—',
+        barcode: p.barcode || p.sku || `BAR-${p._id}`,
+        available_quantity: p.quantity ?? 0,
+        total_sale: p.total_sale || 0,
+      });
+    }
+  });
+
+  const totalCount = allVariants.length;
+  const lowStockCount = allVariants.filter((v) => v.available_quantity <= 5 && v.available_quantity > 0).length;
+  const outOfStockCount = allVariants.filter((v) => v.available_quantity <= 0).length;
+  const inStockCount = allVariants.filter((v) => v.available_quantity > 5).length;
+
+  if (query.status_filter === 'low_stock') {
+    allVariants = allVariants.filter((v) => v.available_quantity <= 5 && v.available_quantity > 0);
+  } else if (query.status_filter === 'out_of_stock') {
+    allVariants = allVariants.filter((v) => v.available_quantity <= 0);
+  } else if (query.status_filter === 'in_stock') {
+    allVariants = allVariants.filter((v) => v.available_quantity > 5);
+  }
+
+  if (query.sort_by === 'available_quantity') {
+    allVariants.sort((a, b) =>
+      query.sort_order === 'asc'
+        ? a.available_quantity - b.available_quantity
+        : b.available_quantity - a.available_quantity,
+    );
+  } else if (query.sort_by === 'total_sale') {
+    allVariants.sort((a, b) =>
+      query.sort_order === 'asc'
+        ? a.total_sale - b.total_sale
+        : b.total_sale - a.total_sale,
+    );
+  } else if (query.sort_by === 'name') {
+    allVariants.sort((a, b) =>
+      query.sort_order === 'asc'
+        ? a.product.name.localeCompare(b.product.name)
+        : b.product.name.localeCompare(a.product.name),
+    );
+  }
+
+  const paginatedVariants = allVariants.slice(skip, skip + limit);
+
+  return {
+    data: paginatedVariants,
+    total: allVariants.length,
+    current_page: page,
+    per_page: limit,
+    last_page: Math.ceil(allVariants.length / limit) || 1,
+    counts: {
+      total: totalCount,
+      low_stock: lowStockCount,
+      out_of_stock: outOfStockCount,
+      in_stock: inStockCount,
+    },
+  };
+};
+
+const updateInventoryQuantityInDB = async (id: string, quantity: number) => {
+  const vRes = await Product.updateOne(
+    { 'product_variants._id': id },
+    { $set: { 'product_variants.$.variant_quantity': quantity } },
+  );
+
+  if (vRes.matchedCount > 0) {
+    return { success: true, message: 'Variant stock updated' };
+  }
+
+  await Product.updateOne({ _id: id }, { $set: { quantity } });
+  return { success: true, message: 'Product stock updated' };
+};
+
+const bulkUpdateInventoryQuantityInDB = async (
+  ids: string[],
+  action: 'set' | 'increase' | 'decrease',
+  value: number,
+) => {
+  for (const id of ids) {
+    if (action === 'set') {
+      await updateInventoryQuantityInDB(id, value);
+    } else {
+      const incVal = action === 'increase' ? value : -value;
+      const vRes = await Product.updateOne(
+        { 'product_variants._id': id },
+        { $inc: { 'product_variants.$.variant_quantity': incVal } },
+      );
+      if (vRes.matchedCount === 0) {
+        await Product.updateOne({ _id: id }, { $inc: { quantity: incVal } });
+      }
+    }
+  }
+  return { success: true, message: 'Bulk stock updated successfully' };
+};
+
 export const ProductServices = {
   createAProductIntoDB,
   getSingleProductFromDB,
@@ -501,4 +654,7 @@ export const ProductServices = {
   getProductFiltersFromDB,
   calculateDiscount,
   importProductsFromCj,
+  getInventoryFromDB,
+  updateInventoryQuantityInDB,
+  bulkUpdateInventoryQuantityInDB,
 };

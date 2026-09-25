@@ -56,7 +56,7 @@ export const runDatabaseBackup = async () => {
 
     // 4. Send Email via exact Invoice system logic
     await sendEmail(
-      'slsuyel@gmail.com',
+      'rabbinurmuktar@gmail.com',
       `📦 Database Backup - ${date}`,
       `Please find the database backup attached for ${date}.`,
       `<p>Database backup for <b>${date}</b> is ready.</p>`,
