@@ -29,6 +29,14 @@ export const createBkashPayment = async (req: Request, res: Response) => {
 
     const response = await BkashService.createPayment(payload);
 
+    if (response?.isCircuitBreakerFallback) {
+      return res.status(503).json({
+        success: false,
+        message: response.statusMessage,
+        fallbackToCOD: true,
+      });
+    }
+
     if (response && response.bkashURL) {
       res.status(200).json({ bkashURL: response.bkashURL });
     } else {

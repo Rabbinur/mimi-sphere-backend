@@ -4,9 +4,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Application, NextFunction, Request, Response } from 'express';
 import fs from 'fs';
+import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import globalErrorHandler from './app/middlewares/globalErrorHandler';
+import { globalLimiter } from './app/middlewares/rateLimiter';
 import router from './app/routes';
 import logger from './app/utils/logger';
 
@@ -21,12 +23,20 @@ if (!fs.existsSync(logDir)) {
 const app: Application = express();
 app.set('trust proxy', 1);
 
+// ================= SECURITY & RATE LIMITING =================
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+app.use(globalLimiter);
+
 // ================= MIDDLEWARE =================
 app.use(compression());
 
 // parsers
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(cookieParser());
 
 // HTTP Request Logging

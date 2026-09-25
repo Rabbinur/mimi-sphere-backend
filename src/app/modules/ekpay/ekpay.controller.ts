@@ -22,6 +22,14 @@ export const initiatePaymentHandler = async (req: Request, res: Response) => {
 
         const ekpayResponse = await initiatePayment(payload);
 
+        if ((ekpayResponse as any)?.isCircuitBreakerFallback) {
+            return res.status(503).json({
+                success: false,
+                message: (ekpayResponse as any).message,
+                fallbackToCOD: true,
+            });
+        }
+
         if (ekpayResponse && ekpayResponse.secure_token) {
             const redirectURL = `https://sandbox.ekpay.gov.bd/ekpaypg/v1?sToken=${ekpayResponse.secure_token}&trnsID=${paymentData.trns_info.trnx_id}`;
             res.json({ redirectURL });

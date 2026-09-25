@@ -2,10 +2,11 @@ import express from 'express';
 import { OrderController } from './order.controller';
 import verifyToken from '../../middlewares/verifyToken';
 import { UserRole } from '../users/user.constant';
+import { orderLimiter } from '../../middlewares/rateLimiter';
 
 const router = express.Router();
 
-router.post('/', OrderController.createOrder);
+router.post('/', orderLimiter, OrderController.createOrder);
 router.post('/track', OrderController.trackOrder);
 router.post(
   '/admin',

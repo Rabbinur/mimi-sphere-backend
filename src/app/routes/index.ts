@@ -33,10 +33,15 @@ import { ReportsRoutes } from '../modules/reports/reports.routes';
 import { DiscountRoutes } from '../modules/discount/discount.route';
 import { supplierRoutes } from '../modules/supplier/supplier.route';
 import { purchaseRoutes } from '../modules/purchase/purchase.route';
+import { CircuitBreakerRoutes } from '../modules/circuit-breaker/circuitBreaker.route';
 
 const router = Router();
 
 const moduleRoutes = [
+  {
+    path: '/circuit-breakers',
+    route: CircuitBreakerRoutes,
+  },
   {
     path: '/discounts',
     route: DiscountRoutes,

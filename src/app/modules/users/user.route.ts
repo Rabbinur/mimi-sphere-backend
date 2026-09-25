@@ -4,22 +4,24 @@ import validateRequest from '../../middlewares/validateRequest';
 import { UserValidationSchema } from './user.validate';
 import verifyToken from '../../middlewares/verifyToken';
 import { UserRole } from './user.constant';
+import { authLimiter } from '../../middlewares/rateLimiter';
 const router = express.Router();
 
 // User routes
 router.post(
   '/create-account',
+  authLimiter,
   validateRequest(UserValidationSchema.createZodSchema),
   UserController.registerUser,
 );
-router.post('/login', UserController.loginUser);
-router.post('/google-login', UserController.googleLogin);
+router.post('/login', authLimiter, UserController.loginUser);
+router.post('/google-login', authLimiter, UserController.googleLogin);
 
 router.post('/refresh-token', UserController.refreshToken);
 
-router.post('/forget-password', UserController.forgetPassword);
+router.post('/forget-password', authLimiter, UserController.forgetPassword);
 
-router.post('/reset-password', UserController.resetPassword);
+router.post('/reset-password', authLimiter, UserController.resetPassword);
 
 router.post('/logout', UserController.logout);
 
